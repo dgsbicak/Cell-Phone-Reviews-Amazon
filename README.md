@@ -38,7 +38,9 @@ memory usage: 1020.4+ KB
 ```
 data['Text'][0]
 ```
+#### Review Example Before Process
 output:
+
 'You won\'t believe what you get for 50$ bucks!\r\r\nByLuisP8on June 18, 2016\r\r\nColor: Black\r\r\nVerified Purchase\r\r\nI must say and admit I was a little concerned about this choice after I bought it but I said "Well what the heck, let\'s give it a try!" It was for my mom anyway but on paper it looked like a nice budget phone, and also I had extra concerns cause I\'m not from usa so retuning this was out of the table. I had to accept whatever came on the box. Fortunately I was wrong.. The product came in perfect condition and brand new of course, no problems with packaging or shipping. And after first hands on the phone, you won\'t believe you pay 60 bucks (after taxes and handling) for this phone.. I MEAN IT! This guys (BLU Inc. ) are doing an awesome job with budget phones. This phone is really awesome. Of course it doesn\'t look fancy or premium because it\'s obviously plastic but you fell like you have a 500$ phone in your hands..\r\r\nSo if you are looking for a budget phone DO NOT hesitate of this one.. you won\'t be sorry!!\r\r\n410 people found this helpful\r\r\nHelpful\r\r\nNot Helpful\r\r\n5 comments\r\r\nReport abuse'
 
 
@@ -75,7 +77,9 @@ Completed within 902.2 seconds.
 ```
 text[0]
 ```
+#### Review Example After Process
 output:
+
 'believe get 50 bucks byluisp8on june 18 2016  black must say admit little concerned choice bought said well heck lets give try mom anyway paper looked like nice budget phone also extra concerns cause im usa retuning table accept whatever came box fortunately wrong product came perfect condition brand new course problems packaging shipping first hands phone believe pay 60 bucks after taxes handling phone mean it guys blu inc  awesome job budget phones phone really awesome course look fancy premium obviously plastic fell like 500 phone hands looking budget phone hesitate one sorry 410 helpful helpful 5 comments report abuse'
 
 
