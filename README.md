@@ -270,7 +270,7 @@ py.iplot(data, filename='Text Length')
 
 PLOTT
 
-Some of the comments doesn't reflect the population; some of them are spams, some of them are overenthusiastic people, and so on. In our refined data, average length of reviews is 142, which means 142 characters found (including blank space characters) on average, in every review. I decided to leave out every comment that is longer than 500 characters.
+Some of the comments don't reflect the population; some of them are spams, some of them are overenthusiastic people, and so on. In our refined data, average length of reviews is 142, which means 142 characters found (including blank space characters) on average, in every review. I decided to leave out every comment that is longer than 500 characters.
 
 ```
 df['textbool'] = df['textlength'].apply(lambda x: 1 if x<500 else 0)
