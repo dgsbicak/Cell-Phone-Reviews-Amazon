@@ -730,4 +730,65 @@ blender, blend_preds = model_eval(blender)
 Fold0, Valid AUC: 0.9202
 Fold1, Valid AUC: 0.8893
 Fold2, Valid AUC: 0.8712
+Fold3, Valid AUC: 0.9018
+Fold4, Valid AUC: 0.8949
+[[ 43341   8331]
+ [  5970 119048]]
+              precision    recall  f1-score   support
+
+         0.0       0.88      0.84      0.86     51672
+         1.0       0.93      0.95      0.94    125018
+
+   micro avg       0.92      0.92      0.92    176690
+   macro avg       0.91      0.90      0.90    176690
+weighted avg       0.92      0.92      0.92    176690
+
+Valid RMSLE: 0.197
+F1_score : 91.91% 
+AUC: 0.8955
+```
+
+
+## Stacking
+```
+stacked_df = pd.DataFrame({
+    'logr_preds':logr_preds,
+    'sgd_preds':sgd_preds,
+    'tree_preds':tree_preds,
+    'lgb_preds':lgb_preds,
+    'blend_preds':blend
+})
+```
+### Stacking with XGBoost Classifier
+```
+from xgboost import XGBClassifier
+
+s_train, s_test, y_train, y_test = train_test_split(stacked_df, y, test_size=0.3, random_state=1)
+
+xgb = XGBClassifier()
+xgb.fit(s_train,y_train)
+stack_pred = xgb.predict(s_test)
+
+print(confusion_matrix(stack_pred, y_test))
+print(classification_report(stack_pred, y_test))
+print('Valid RMSLE: {:.3f}'.format(np.sqrt(mean_squared_log_error(stack_pred, y_test))))
+print("F1_score : {:.2%} ".format(f1_score(stack_pred, y_test)))
+print('ROC AUC: {:.4f}'.format(roc_auc_score(stack_pred, y_test))
+```
+
+```
+[[12808  1582]
+ [ 2741 35876]]
+              precision    recall  f1-score   support
+
+         0.0       0.82      0.89      0.86     14390
+         1.0       0.96      0.93      0.94     38617
+
+   micro avg       0.92      0.92      0.92     53007
+   macro avg       0.89      0.91      0.90     53007
+weighted avg       0.92      0.92      0.92     53007
+
+Valid RMSLE: 0.198
+F1_score : 94.32% 
+ROC AUC: 0.9095
 ```
