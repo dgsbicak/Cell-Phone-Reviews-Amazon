@@ -7,9 +7,8 @@ import numpy as np
 import pickle
 import time
 import string
-from nltk.corpus import stopwords
 import os
-os.chdir(r"...\Amazon Project")
+os.chdir(r"C:\Users\dogus\Dropbox\DgsPy_DBOX\Amazon Project")
 
 import plotly.offline as py
 py.init_notebook_mode(connected=True)
@@ -17,7 +16,28 @@ import plotly.graph_objs as go
 import matplotlib.pyplot as plt
 %matplotlib inline
 
+from nltk.corpus import stopwords
+from contextlib import contextmanager
+import eli5
+
+import warnings
+warnings.filterwarnings("ignore")
+
+from sklearn.model_selection import ShuffleSplit, learning_curve
+from sklearn.model_selection import train_test_split
+from sklearn.model_selection import StratifiedKFold
+
+from sklearn.linear_model import SGDClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import confusion_matrix, classification_report
+from sklearn.metrics import f1_score, log_loss,roc_auc_score
+from sklearn.metrics import accuracy_score
+from sklearn.metrics import mean_squared_log_error
+
+from sklearn.feature_extraction.text import TfidfTransformer, TfidfVectorizer, CountVectorizer
+from sklearn.ensemble import RandomForestClassifier
 ```
+
 ```
 def combine_CSVs_infolder():
     os.chdir(r"C:\Users\dogus\Dropbox\DgsPy_DBOX\Amazon Project\comments_AMAZON")
@@ -55,7 +75,7 @@ def clean_str(text):
 def clean_int2(text):
     import re
     output = re.sub(r'\d+', '', str(text))
-    return output  # 'hello world'
+    return output
 
 def sorttext(x):
     iscolor = x[3][:5]=='Color'
@@ -75,26 +95,70 @@ def sorttext(x):
             x = " ".join(x[4:-2])
     return x
 
+def plot_learning_curve(estimator, title, X, y, ylim=None, cv=None,
+                        n_jobs=1, train_sizes=np.linspace(.1, 1.0, 5)):
+    plt.figure()
+    plt.subplots(figsize=(12,6))
+    plt.title(title)
+    if ylim is not None:
+        plt.ylim(*ylim)
+    plt.xlabel("Training examples")
+    plt.ylabel("Score")
+    
+    train_sizes, train_scores, test_scores = learning_curve(
+        estimator, X, y, cv=cv, n_jobs=n_jobs, train_sizes=train_sizes)
+    train_scores_mean = np.mean(train_scores, axis=1)
+    train_scores_std = np.std(train_scores, axis=1)
+    test_scores_mean = np.mean(test_scores, axis=1)
+    test_scores_std = np.std(test_scores, axis=1)
+    plt.grid()
+
+    plt.fill_between(train_sizes, train_scores_mean - train_scores_std,
+                     train_scores_mean + train_scores_std, alpha=0.1,
+                     color="r")
+    plt.fill_between(train_sizes, test_scores_mean - test_scores_std,
+                     test_scores_mean + test_scores_std, alpha=0.1, color="g")
+    plt.plot(train_sizes, train_scores_mean, 'o-', color="r",
+             label="Training score")
+    plt.plot(train_sizes, test_scores_mean, 'o-', color="g",
+             label="Cross-validation score")
+
+    plt.legend(loc="best")
+    plt.savefig('learningcurves.png')
+    return plt
+
+def model_eval(model, k=5, seed=0):
+    kfold = StratifiedKFold(k, random_state=seed)
+    
+    oof = np.zeros(len(y))
+    for nfold, (train_ix, valid_ix) in enumerate(kfold.split(X,y)):
+        trainX, validX = X[train_ix], X[valid_ix]
+        trainy, validy = y[train_ix], y[valid_ix]
+
+        model.fit(trainX, trainy)
+        p = model.predict(validX)
+        oof[valid_ix] = p
+        
+        print('Fold{}, Valid AUC: {:.4f}'.format(nfold,roc_auc_score(validy, p)))
+        
+    print(confusion_matrix(y, oof))
+    print(classification_report(y, oof))
+    print('Valid RMSLE: {:.3f}'.format(np.sqrt(mean_squared_log_error(y, oof))))
+    print("F1_score : {:.2%} ".format(f1_score(y, oof, average='micro')))  # 'samples', 'weighted', 'macro', 'micro', 'binary'
+    print('AUC: {:.4f}'.format(roc_auc_score(y, oof)))
+    
+    return model, oof
+
 data = pd.read_csv('AMAZON_comments_yuge.csv')
 print(data.info())
 data = data.drop_duplicates(subset='Text', keep=False)
 data.reset_index(inplace=True,drop=True)
 df = data.copy()
 print(df.info())
-
 ```
 
 
 ```
-<class 'pandas.core.frame.DataFrame'>
-RangeIndex: 214993 entries, 0 to 214992
-Data columns (total 3 columns):
-Text           214993 non-null object
-Phone Title    214993 non-null object
-Stars          214993 non-null int64
-dtypes: int64(1), object(2)
-memory usage: 4.9+ MB
-None
 <class 'pandas.core.frame.DataFrame'>
 RangeIndex: 199672 entries, 0 to 199671
 Data columns (total 3 columns):
@@ -262,7 +326,8 @@ Name: textlength, dtype: float64
 trace = go.Scattergl(
     x = df['textlength'].index,
     y = df['textlength'].values,
-    mode='markers'
+    mode='markers',
+    marker=dict(opacity=0.1)
 )
 data = [trace]
 py.iplot(data, filename='Text Length')
@@ -316,7 +381,7 @@ py.iplot(fig, filename='StarCounts')
 
 PLOTT
 
-### Wordcloud
+## Wordcloud
 ```
 # Randomly picked 10000 sample texts merged into one big text
 tt = []
@@ -329,7 +394,7 @@ TEXT = " ".join(tt)
 from wordcloud import WordCloud, STOPWORDS
 
 wordcloud = WordCloud(
-    background_color='black',
+    background_color='white',
     stopwords=STOPWORDS,
     max_words=200,
     max_font_size=100,
@@ -344,6 +409,7 @@ plt.imshow(wordcloud)
 ```
 CLOUDIMG
 
+## Word Frequency Plots
 ```
 from collections import defaultdict
 from plotly import tools
@@ -411,141 +477,257 @@ fig.append_trace(trace2, 1, 3)
 fig['layout'].update(height=1200, width=900, paper_bgcolor='rgb(233,233,233)', title="Word Count Plots")
 py.iplot(fig, filename='word-plots')
 ```
-
 WORDFQPLOT
 
+## Bigram Count Plots
+
+```
+freq_dict = defaultdict(int)
+for sent in df5:
+    for word in generate_ngrams(sent,2):
+        freq_dict[word] += 1
+fd_sorted = pd.DataFrame(sorted(freq_dict.items(), key=lambda x: x[1])[::-1])
+fd_sorted.columns = ["word", "wordcount"]
+trace0 = horizontal_bar_chart(fd_sorted.head(50), 'orange')
 
 
-# Vectorization
+freq_dict = defaultdict(int)
+for sent in df1:
+    for word in generate_ngrams(sent,2):
+        freq_dict[word] += 1
+fd_sorted = pd.DataFrame(sorted(freq_dict.items(), key=lambda x: x[1])[::-1])
+fd_sorted.columns = ["word", "wordcount"]
+trace1 = horizontal_bar_chart(fd_sorted.head(50), 'orange')
+
+# Creating two subplots
+fig = tools.make_subplots(rows=1, cols=2, vertical_spacing=0.04,horizontal_spacing=0.15,
+                          subplot_titles=["5 Starred: Word Bigram Frequency", 
+                                          "1 Starred: Word Bigram Frequency"])
+fig.append_trace(trace0, 1, 1)
+fig.append_trace(trace1, 1, 2)
+fig['layout'].update(height=1200, width=900, paper_bgcolor='rgb(233,233,233)', title="Bigram Count Plots")
+py.iplot(fig, filename='word-plots')
+```
+WORDFQPLOT
+
+# Algorithm Training
+
+## Target Feature: Satisfaction 
+Since the data I mined doesn't contain enough sample to train algorithms to predict 2,3,4 starred comments, I decided to seperate the data into two segments, positive and negative comments, by naming 5 and 4 starred comments "1" and 1 and 2 starred comments "0".
+```
+df['Stars'] = df['Stars'].astype(float)
+# Negative, Positive, Neutr Comments
+df['Satisfaction'] = df['Stars'].apply(lambda x: 0 if x<=2 else (1 if x>=4 else 2))
+df = df[df['Satisfaction']!=2]
+len(df[df['Satisfaction']==0]),len(df[df['Satisfaction']==1])
+df.reset_index(drop=True, inplace=True)
+```
+
+## Vectorization
 ### CountVectorizer
 ```
 text = df['Text']
-count_vec = CountVectorizer(ngram_range=(1, 3),
-                            #max_df=0.50,
-                            analyzer='word',
-                           token_pattern = r'\w{2,}'
-                           )
-feature_train_counts = count_vec.fit(text)
-bag_of_words = feature_train_counts.transform(text)
+tfidf = TfidfVectorizer(token_pattern=r'\w{2,}',
+                        ngram_range=(1, 3),
+                        max_df=0.5,
+                        #encoding='utf-8',
+                        #decode_error='ignore',
+                        #strip_accents='unicode'
+                       )
 
-X = bag_of_words
-#y = df['Stars'].astype(float)
-y = df['Stars']
+tfidf.fit(text)
+trans_tfidf = tfidf.transform(text)
+#trans_tfidf = tfidf_fitted.transform(feature_test)
+
+from sklearn.model_selection import train_test_split
+X = trans_tfidf
+y = df['Satisfaction'].astype(float)
+
+feature_train, feature_test, label_train, label_test = train_test_split(X, y, test_size=0.3, shuffle=True)
 ```
 
 # Model Building
-
 ## Logistic Regression
 ```
-feature_train, feature_test, label_train, label_test = train_test_split(X, y, test_size=0.33, shuffle=True)
-clf = LogisticRegression().fit(feature_train, label_train)
-preds_lr = clf.predict(feature_test)
-preds_proba = clf.predict_proba(feature_test)
-
-print(confusion_matrix(label_test, preds_lr))
-print(classification_report(label_test, preds_lr))
-print('Valid RMSLE: {:.4f}'.format(np.sqrt(mean_squared_log_error(label_test, preds_lr))))
-print("F1_score : {:.2%} ".format(f1_score(label_test, preds_lr, average='micro')))  # 'samples', 'weighted', 'macro', 'micro', 'binary'
-print("Log_loss : {:.4f} ".format(log_loss(label_test, preds_proba)))
+logr = LogisticRegression()
+logr, logr_preds = model_eval(logr)
 ```
+
+```
+Fold0, Valid AUC: 0.9176
+Fold1, Valid AUC: 0.8852
+Fold2, Valid AUC: 0.8683
+Fold3, Valid AUC: 0.8976
+Fold4, Valid AUC: 0.8917
+[[ 42680   8992]
+ [  5226 119792]]
+              precision    recall  f1-score   support
+
+         0.0       0.89      0.83      0.86     51672
+         1.0       0.93      0.96      0.94    125018
+
+   micro avg       0.92      0.92      0.92    176690
+   macro avg       0.91      0.89      0.90    176690
+weighted avg       0.92      0.92      0.92    176690
+
+Valid RMSLE: 0.197
+F1_score : 91.95% 
+AUC: 0.8921
+```
+
+```
+```
+sgdWeights
+
+```
+plot_learning_curve(logr,'Logistic Regression', X=X, y=y, n_jobs=4)
+```
+Learning Curve
 
 ## Stochastic Gradient Descent Classifier
 ```
-from sklearn.linear_model import SGDClassifier
-from sklearn.metrics import confusion_matrix, classification_report
-from sklearn.metrics import f1_score, log_loss
+model = SGDClassifier(loss='modified_huber')
+sgd, sgd_preds = model_eval(model)
+```
 
-clf = SGDClassifier(loss='log').fit(feature_train, label_train)
-preds_sgd = clf.predict(feature_test)
-preds_proba = clf.predict_proba(feature_test)
+```
+Fold0, Valid AUC: 0.9173
+Fold1, Valid AUC: 0.8821
+Fold2, Valid AUC: 0.8668
+Fold3, Valid AUC: 0.8969
+Fold4, Valid AUC: 0.8891
+[[ 42512   9160]
+ [  5231 119787]]
+              precision    recall  f1-score   support
 
-print(confusion_matrix(label_test, preds_sgd))
-print(classification_report(label_test, preds_sgd))
-print('Valid RMSLE: {:.4f}'.format(np.sqrt(mean_squared_log_error(label_test, preds_sgd))))
-print("F1_score : {:.2%} ".format(f1_score(label_test, preds_sgd, average='micro')))  # 'samples', 'weighted', 'macro', 'micro', 'binary'
-print("Log_loss : {:.4f} ".format(log_loss(label_test, preds_proba)))
+         0.0       0.89      0.82      0.86     51672
+         1.0       0.93      0.96      0.94    125018
 
-"""
-Valid RMSLE: 0.2126
-F1_score : 80.53% 
-Log_loss : 1.3345 
+   micro avg       0.92      0.92      0.92    176690
+   macro avg       0.91      0.89      0.90    176690
+weighted avg       0.92      0.92      0.92    176690
 
-Valid RMSLE: 0.2194
-F1_score : 80.47% 
-Log_loss : 0.7738 
+Valid RMSLE: 0.198
+F1_score : 91.86% 
+AUC: 0.8904
+```
 
-Valid RMSLE: 0.2286
-F1_score : 80.48% 
-Log_loss : 0.7692  # trimmed a little
-"""
 ```
 ```
-[[3292  101   64   53  122]
- [ 452  520   96   57   90]
- [ 258  103  762  211  207]
- [  88   32  106 1703  730]
- [ 104   22   40  326 7113]]
-             precision    recall  f1-score   support
+sgdWeights
 
-        1.0       0.78      0.91      0.84      3632
-        2.0       0.67      0.43      0.52      1215
-        3.0       0.71      0.49      0.58      1541
-        4.0       0.72      0.64      0.68      2659
-        5.0       0.86      0.94      0.90      7605
-
-avg / total       0.79      0.80      0.79     16652
-
-Valid RMSLE: 0.2221
-F1_score : 80.41% 
-Log_loss : 0.7619 
 ```
-![sgdc](https://user-images.githubusercontent.com/23128332/43723046-6626896c-999f-11e8-9dd5-4909a720a8d5.PNG)
-
-## LogisticRegression
+plot_learning_curve(sgd,'Logistic Regression', X=X, y=y, n_jobs=4)
 ```
-from sklearn.linear_model import LogisticRegression
+Learning Curve
 
-clf = LogisticRegression(C=10).fit(feature_train, label_train)
-preds_lr = clf.predict(feature_test)
-preds_proba = clf.predict_proba(feature_test)
-
-print(confusion_matrix(label_test, preds_lr))
-print(classification_report(label_test, preds_lr))
-print('Valid RMSLE: {:.4f}'.format(np.sqrt(mean_squared_log_error(label_test, preds_lr))))
-print("F1_score : {:.2%} ".format(f1_score(label_test, preds_lr, average='micro')))  # 'samples', 'weighted', 'macro', 'micro', 'binary'
-print("Log_loss : {:.4f} ".format(log_loss(label_test, preds_proba)))
-"""
-Valid RMSLE: 0.2063
-F1_score : 81.20% 
-Log_loss : 0.8746 
-
-Valid RMSLE: 0.2207
-F1_score : 80.30% 
-Log_loss : 0.8388 
-
-Valid RMSLE: 0.2270
-F1_score : 80.54% 
-Log_loss : 0.8218 # trimmed a little
-"""
+## RandomForestClassifier
+```
+tree = RandomForestClassifier(verbose=1, n_jobs=-1)
+tree , tree_preds = model_eval(tree,k=2)
 ```
 ```
-[[3271  107   64   56  134]
- [ 420  529   99   61  106]
- [ 258   87  786  185  225]
- [  83   37  107 1649  783]
- [ 104   17   46  260 7178]]
-             precision    recall  f1-score   support
+Fold1, Valid AUC: 0.8536
+[[ 38910  12762]
+ [  7222 117796]]
+              precision    recall  f1-score   support
 
-        1.0       0.79      0.90      0.84      3632
-        2.0       0.68      0.44      0.53      1215
-        3.0       0.71      0.51      0.59      1541
-        4.0       0.75      0.62      0.68      2659
-        5.0       0.85      0.94      0.90      7605
+         0.0       0.84      0.75      0.80     51672
+         1.0       0.90      0.94      0.92    125018
 
-avg / total       0.80      0.81      0.79     16652
+   micro avg       0.89      0.89      0.89    176690
+   macro avg       0.87      0.85      0.86    176690
+weighted avg       0.89      0.89      0.88    176690
 
-Valid RMSLE: 0.2245
-F1_score : 80.55% 
-Log_loss : 0.8122 
+Valid RMSLE: 0.233
+F1_score : 88.69% 
+AUC: 0.8476
+Wall time: 19min 14s
 ```
-![logisticr](https://user-images.githubusercontent.com/23128332/43723039-627e5eac-999f-11e8-8538-aa6786856695.PNG)
+```
+std = np.std([ree.feature_importances_ for ree in tree.estimators_], axis=0).astype(np.float32)
+imps = pd.DataFrame({
+    'Features':tfidf.get_feature_names(),
+    'Importances':tree.feature_importances_.astype(np.float32),
+    'Stds':std
+    }
+            ).sort_values(by='Importances', ascending=False).reset_index(drop=True)
+imps.to_csv('important_features.csv',index=False)
+
+trace = go.Bar(x=imps.Features[:20],
+                y=imps.Importances[:20],
+                marker=dict(color='red'),
+                error_y = dict(visible=True, arrayminus=imps.Stds[:20]),
+                opacity=0.5
+               )
+layout = go.Layout(title="RandomForest Feature Importances")
+fig = go.Figure(data=[trace], layout=layout)
+py.iplot(fig)
+```
+Importance Graph
+
+## Lightgbm
+```
+import lightgbm as lgb
+from lightgbm import LGBMClassifier
+
+model = LGBMClassifier()
+lgb_model, lgb_preds = model_eval(model)
+```
+```
+Fold0, Valid AUC: 0.8959
+Fold1, Valid AUC: 0.8629
+Fold2, Valid AUC: 0.8474
+Fold3, Valid AUC: 0.8698
+Fold4, Valid AUC: 0.8636
+[[ 40526  11146]
+ [  6054 118964]]
+              precision    recall  f1-score   support
+
+         0.0       0.87      0.78      0.82     51672
+         1.0       0.91      0.95      0.93    125018
+
+   micro avg       0.90      0.90      0.90    176690
+   macro avg       0.89      0.87      0.88    176690
+weighted avg       0.90      0.90      0.90    176690
+
+Valid RMSLE: 0.216
+F1_score : 90.27% 
+AUC: 0.8679
+```
+```
+eli5.show_weights(lgb_model, vec=tfidf, top=50)
+```
+lgbWeights
+
+## Blending
+```
+# Simple Averaging
+blend = (logr_preds + sgd_preds + tree_preds + lgb_preds)/4
+print('Valid RMSLE: {:.4f}'.format(np.sqrt(mean_squared_log_error(y, blend))))
+print('AUC: {:.4f}'.format(roc_auc_score(y, blend)))
+```
+```
+Valid RMSLE: 0.1860
+AUC: 0.9222
+```
+
+### Voting Classifier
+```
+from sklearn.ensemble import VotingClassifier
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=0)
+
+blender = VotingClassifier(estimators=[('logr',logr),
+                                     ('SGD',sgd),
+                                     ('tree',tree),
+                                     ('lgb',lgb_model)],
+                         voting='hard'                         
+                        )
+blender, blend_preds = model_eval(blender)
+```
+
+```
+Fold0, Valid AUC: 0.9202
+Fold1, Valid AUC: 0.8893
+Fold2, Valid AUC: 0.8712
+```
