@@ -815,8 +815,10 @@ Output:
 
 
 ## Things to do:
+```
 1- Make research for better NLP techniques
 2- Feature engineering
 3- Model optimizations via gridsearch
 4- Apply neural networks
 5- More models for stacking
+```
