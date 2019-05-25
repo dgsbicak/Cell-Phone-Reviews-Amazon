@@ -679,6 +679,7 @@ fig = go.Figure(data=[trace], layout=layout)
 py.iplot(fig)
 ```
 Output:
+
 ![RF_FI](https://user-images.githubusercontent.com/23128332/58369287-ea59ec00-7f00-11e9-80a3-7d19effdd328.png)
 
 ## Lightgbm
