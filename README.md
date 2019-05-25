@@ -1,4 +1,16 @@
 # Cell-Phone-Reviews-Amazon
+
+I decided to do a NLP project, because I could gather my own data via data mining, and I decided not to use ready made data from the internet. I managed to gather almost 200k samples, and after preprocessing I was left with 180k samples in total. Since the amount of data I have was not enough for training an algorithm to successfully predict amongst 5 review stars I decided to create 'Positive Review' class by merging 5-4 starred comments, and a 'Negative Review' class by merging 1-2 starred comments. I didn't want to create a 'Neutral Review' class because 13296 sample size was not enough to train an algorithm to successfully predict, and It would further decrease the performance by increasing the complexity. Sample size numbers for review stars are shown below:
+```
+    5    100006
+    1     40217
+    4     25010
+    3     13296
+    2     11450
+```
+
+
+## Importing Libraries
 ```
 import re
 import csv
@@ -38,6 +50,7 @@ from sklearn.feature_extraction.text import TfidfTransformer, TfidfVectorizer, C
 from sklearn.ensemble import RandomForestClassifier
 ```
 
+## Functions Used
 ```
 def combine_CSVs_infolder():
     os.chdir(r"C:\Users\dogus\Dropbox\DgsPy_DBOX\Amazon Project\comments_AMAZON")
@@ -148,7 +161,10 @@ def model_eval(model, k=5, seed=0):
     print('AUC: {:.4f}'.format(roc_auc_score(y, oof)))
     
     return model, oof
+```
 
+## Read the merged data
+```
 data = pd.read_csv('AMAZON_comments_yuge.csv')
 print(data.info())
 data = data.drop_duplicates(subset='Text', keep=False)
@@ -156,7 +172,6 @@ data.reset_index(inplace=True,drop=True)
 df = data.copy()
 print(df.info())
 ```
-
 
 ```
 <class 'pandas.core.frame.DataFrame'>
@@ -170,7 +185,7 @@ memory usage: 4.6+ MB
 None
 ```
 
-#### A sample from the data
+### A sample from the data
 ```
 df['Text'][85101]
 ```
@@ -179,7 +194,7 @@ output:
 'Kenneth B.\r\r\nFive Stars\r\r\nJune 5, 2016\r\r\nStyle: U.S. Version (LGUS991)Verified Purchase\r\r\nNice phone\r\r\nHelpful\r\r\nComment Report abuse'
 ```
 
-If we split the example from the parts where '\r\r\n' exists:
+If we split the example from the parts where '\r\r\n' exists, we sort the Text data much easier.
 ```
 df['Text'][85101].split('\r\r\n')
 ```
@@ -194,7 +209,7 @@ output:
  'Comment Report abuse']
 ```
 
-### Preprocessing
+## Preprocessing
 ```
 # Clean some of the repetitive words.
 df['Text'] = df['Text'].apply(clean_int2)  # Clean any integer value
@@ -342,7 +357,7 @@ df['textbool'] = df['textlength'].apply(lambda x: 1 if x<500 else 0)
 df = df[df['textbool']==1]
 ```
 
-# Target Distribution
+## Target Distribution
 
 ```
 starsfq = df['Stars'].value_counts()
@@ -668,6 +683,7 @@ from lightgbm import LGBMClassifier
 model = LGBMClassifier()
 lgb_model, lgb_preds = model_eval(model)
 ```
+Output:
 ```
 Fold0, Valid AUC: 0.8959
 Fold1, Valid AUC: 0.8629
@@ -692,6 +708,7 @@ AUC: 0.8679
 ```
 eli5.show_weights(lgb_model, vec=tfidf, top=50)
 ```
+Output:
 ![lgweights](https://user-images.githubusercontent.com/23128332/58370208-7d4c5380-7f0c-11e9-8193-3d90984094d3.JPG)
 
 ## Blending
@@ -701,6 +718,7 @@ blend = (logr_preds + sgd_preds + tree_preds + lgb_preds)/4
 print('Valid RMSLE: {:.4f}'.format(np.sqrt(mean_squared_log_error(y, blend))))
 print('AUC: {:.4f}'.format(roc_auc_score(y, blend)))
 ```
+Output:
 ```
 Valid RMSLE: 0.1860
 AUC: 0.9222
@@ -719,7 +737,8 @@ blender = VotingClassifier(estimators=[('logr',logr),
                         )
 blender, blend_preds = model_eval(blender)
 ```
-
+Simple averaging gives much better performance than voting classifier. Simple blend predictions will be used in the Stacking stage.
+Output:
 ```
 Fold0, Valid AUC: 0.9202
 Fold1, Valid AUC: 0.8893
@@ -741,7 +760,6 @@ Valid RMSLE: 0.197
 F1_score : 91.91% 
 AUC: 0.8955
 ```
-
 
 ## Stacking
 ```
@@ -769,7 +787,7 @@ print('Valid RMSLE: {:.3f}'.format(np.sqrt(mean_squared_log_error(stack_pred, y_
 print("F1_score : {:.2%} ".format(f1_score(stack_pred, y_test)))
 print('ROC AUC: {:.4f}'.format(roc_auc_score(stack_pred, y_test))
 ```
-
+Output:
 ```
 [[12808  1582]
  [ 2741 35876]]
@@ -788,3 +806,11 @@ ROC AUC: 0.9095
 ```
 
 ![stackweights](https://user-images.githubusercontent.com/23128332/58369815-98b55f80-7f08-11e9-8b65-d4eac6cb3f26.JPG)
+
+
+## Things to do:
+1- Make research for better NLP techniques
+2- Feature engineering
+3- Model optimizations via gridsearch
+4- Apply neural networks
+5- More models for stacking
