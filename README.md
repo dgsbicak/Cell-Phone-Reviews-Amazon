@@ -394,6 +394,7 @@ fig = go.Figure(
 py.iplot(fig, filename='StarCounts')
 ```
 Output:
+
 ![newplot (1)](https://user-images.githubusercontent.com/23128332/58369284-e9c15580-7f00-11e9-8dbb-3ddd9b03138b.png)
 
 ## Wordcloud
@@ -423,6 +424,7 @@ plt.figure(figsize=(24,12))
 plt.imshow(wordcloud)
 ```
 Output:
+
 ![wordcld](https://user-images.githubusercontent.com/23128332/58369328-8edc2e00-7f01-11e9-9a87-49bda97d17e0.png)
 
 ## Word Frequency Plots
@@ -494,6 +496,7 @@ fig['layout'].update(height=1200, width=900, paper_bgcolor='rgb(233,233,233)', t
 py.iplot(fig, filename='word-plots')
 ```
 Output:
+
 ![newplot (2)](https://user-images.githubusercontent.com/23128332/58369285-ea59ec00-7f00-11e9-8f3f-6a9808905e13.png)
 
 ## Bigram Count Plots
@@ -526,6 +529,7 @@ fig['layout'].update(height=1200, width=900, paper_bgcolor='rgb(233,233,233)', t
 py.iplot(fig, filename='word-plots')
 ```
 Output:
+
 ![newplot (3)](https://user-images.githubusercontent.com/23128332/58369286-ea59ec00-7f00-11e9-8a84-60b4ccedca22.png)
 
 # Algorithm Training
@@ -597,6 +601,7 @@ AUC: 0.8921
 plot_learning_curve(logr,'Logistic Regression', X=X, y=y, n_jobs=4)
 ```
 Output:
+
 ![logrLC](https://user-images.githubusercontent.com/23128332/58369824-b5519780-7f08-11e9-8884-6ab247d0eeee.png)
 
 ## Stochastic Gradient Descent Classifier
@@ -627,12 +632,14 @@ F1_score : 91.86%
 AUC: 0.8904
 ```
 Output:
+
 ![sgdfeaturew](https://user-images.githubusercontent.com/23128332/58369814-97843280-7f08-11e9-8ad8-94783c986363.JPG)
 
 ```
 plot_learning_curve(sgd,'Logistic Regression', X=X, y=y, n_jobs=4)
 ```
 Output:
+
 ![SGDLR](https://user-images.githubusercontent.com/23128332/58369823-b5519780-7f08-11e9-9eb1-0fa0a2a2d34c.png)
 
 ## RandomForestClassifier
@@ -716,6 +723,7 @@ AUC: 0.8679
 eli5.show_weights(lgb_model, vec=tfidf, top=50)
 ```
 Output:
+
 ![lgweights](https://user-images.githubusercontent.com/23128332/58370208-7d4c5380-7f0c-11e9-8193-3d90984094d3.JPG)
 
 ## Blending
@@ -812,6 +820,7 @@ F1_score : 94.32%
 ROC AUC: 0.9095
 ```
 Output:
+
 ![stackweights](https://user-images.githubusercontent.com/23128332/58369815-98b55f80-7f08-11e9-8b65-d4eac6cb3f26.JPG)
 
 
