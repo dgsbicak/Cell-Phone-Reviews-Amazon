@@ -837,4 +837,6 @@ Output:
 3- Model optimizations via gridsearch
 4- Apply neural networks
 5- More models for stacking
+
+- Sentimental Analysis
 ```
