@@ -172,7 +172,7 @@ data.reset_index(inplace=True,drop=True)
 df = data.copy()
 print(df.info())
 ```
-
+Output:
 ```
 <class 'pandas.core.frame.DataFrame'>
 RangeIndex: 199672 entries, 0 to 199671
@@ -298,7 +298,7 @@ df['Text'] = df['Text'].apply(lambda x: x.replace('amazon',""))
 print("Completed within %0.1f minutes." % ((time.time() - t0)/60)) # 13.7
 print(df['Text'][0],"\n")
 ```
-
+Output:
 ```
 Really really good! It's like a new phone, no one scratches, I'm really happy with it, just the charger is not original but I don't care, it's good enough Nice! 
 
@@ -323,7 +323,7 @@ really really good like phone scratches really happy charger care good enough ni
 df['textlength'] = df['Text'].apply(lambda x: len(x))
 df['textlength'].describe()
 ```
-
+Output:
 ```
 count    199672.000000
 mean        142.354912
@@ -347,7 +347,7 @@ trace = go.Scattergl(
 data = [trace]
 py.iplot(data, filename='Text Length')
 ```
-
+Output:
 ![newplot](https://user-images.githubusercontent.com/23128332/58370096-3873ed00-7f0b-11e9-825d-e67a50fe1b72.png)
 
 Some of the comments don't reflect the population; some of them are spams, some of them are overenthusiastic people writing too long comments, and so on. In our refined data, average length of reviews is 142, which means 142 characters found (including blank space characters) on average, in every review. I decided to leave out every comment that is longer than 500 characters.
@@ -363,7 +363,7 @@ df = df[df['textbool']==1]
 starsfq = df['Stars'].value_counts()
 df['Stars'].value_counts()
 ```
-
+Output:
 ```
 5    100006
 1     40217
@@ -393,7 +393,7 @@ fig = go.Figure(
     )
 py.iplot(fig, filename='StarCounts')
 ```
-
+Output:
 ![newplot (1)](https://user-images.githubusercontent.com/23128332/58369284-e9c15580-7f00-11e9-8dbb-3ddd9b03138b.png)
 
 ## Wordcloud
@@ -422,6 +422,7 @@ wordcloud.generate(TEXT)
 plt.figure(figsize=(24,12))
 plt.imshow(wordcloud)
 ```
+Output:
 ![wordcld](https://user-images.githubusercontent.com/23128332/58369328-8edc2e00-7f01-11e9-9a87-49bda97d17e0.png)
 
 ## Word Frequency Plots
@@ -492,6 +493,7 @@ fig.append_trace(trace2, 1, 3)
 fig['layout'].update(height=1200, width=900, paper_bgcolor='rgb(233,233,233)', title="Word Count Plots")
 py.iplot(fig, filename='word-plots')
 ```
+Output:
 ![newplot (2)](https://user-images.githubusercontent.com/23128332/58369285-ea59ec00-7f00-11e9-8f3f-6a9808905e13.png)
 
 ## Bigram Count Plots
@@ -523,6 +525,7 @@ fig.append_trace(trace1, 1, 2)
 fig['layout'].update(height=1200, width=900, paper_bgcolor='rgb(233,233,233)', title="Bigram Count Plots")
 py.iplot(fig, filename='word-plots')
 ```
+Output:
 ![newplot (3)](https://user-images.githubusercontent.com/23128332/58369286-ea59ec00-7f00-11e9-8a84-60b4ccedca22.png)
 
 # Algorithm Training
@@ -567,7 +570,7 @@ feature_train, feature_test, label_train, label_test = train_test_split(X, y, te
 logr = LogisticRegression()
 logr, logr_preds = model_eval(logr)
 ```
-
+Output:
 ```
 Fold0, Valid AUC: 0.9176
 Fold1, Valid AUC: 0.8852
@@ -593,6 +596,7 @@ AUC: 0.8921
 ```
 plot_learning_curve(logr,'Logistic Regression', X=X, y=y, n_jobs=4)
 ```
+Output:
 ![logrLC](https://user-images.githubusercontent.com/23128332/58369824-b5519780-7f08-11e9-8884-6ab247d0eeee.png)
 
 ## Stochastic Gradient Descent Classifier
@@ -600,7 +604,7 @@ plot_learning_curve(logr,'Logistic Regression', X=X, y=y, n_jobs=4)
 model = SGDClassifier(loss='modified_huber')
 sgd, sgd_preds = model_eval(model)
 ```
-
+Output:
 ```
 Fold0, Valid AUC: 0.9173
 Fold1, Valid AUC: 0.8821
@@ -622,12 +626,13 @@ Valid RMSLE: 0.198
 F1_score : 91.86% 
 AUC: 0.8904
 ```
-
+Output:
 ![sgdfeaturew](https://user-images.githubusercontent.com/23128332/58369814-97843280-7f08-11e9-8ad8-94783c986363.JPG)
 
 ```
 plot_learning_curve(sgd,'Logistic Regression', X=X, y=y, n_jobs=4)
 ```
+Output:
 ![SGDLR](https://user-images.githubusercontent.com/23128332/58369823-b5519780-7f08-11e9-9eb1-0fa0a2a2d34c.png)
 
 ## RandomForestClassifier
@@ -673,6 +678,7 @@ layout = go.Layout(title="RandomForest Feature Importances")
 fig = go.Figure(data=[trace], layout=layout)
 py.iplot(fig)
 ```
+Output:
 ![RF_FI](https://user-images.githubusercontent.com/23128332/58369287-ea59ec00-7f00-11e9-80a3-7d19effdd328.png)
 
 ## Lightgbm
@@ -804,7 +810,7 @@ Valid RMSLE: 0.198
 F1_score : 94.32% 
 ROC AUC: 0.9095
 ```
-
+Output:
 ![stackweights](https://user-images.githubusercontent.com/23128332/58369815-98b55f80-7f08-11e9-8b65-d4eac6cb3f26.JPG)
 
 
