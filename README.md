@@ -333,9 +333,9 @@ data = [trace]
 py.iplot(data, filename='Text Length')
 ```
 
-PLOTT
+![newplot](https://user-images.githubusercontent.com/23128332/58370096-3873ed00-7f0b-11e9-825d-e67a50fe1b72.png)
 
-Some of the comments don't reflect the population; some of them are spams, some of them are overenthusiastic people, and so on. In our refined data, average length of reviews is 142, which means 142 characters found (including blank space characters) on average, in every review. I decided to leave out every comment that is longer than 500 characters.
+Some of the comments don't reflect the population; some of them are spams, some of them are overenthusiastic people writing too long comments, and so on. In our refined data, average length of reviews is 142, which means 142 characters found (including blank space characters) on average, in every review. I decided to leave out every comment that is longer than 500 characters.
 
 ```
 df['textbool'] = df['textlength'].apply(lambda x: 1 if x<500 else 0)
@@ -379,7 +379,7 @@ fig = go.Figure(
 py.iplot(fig, filename='StarCounts')
 ```
 
-PLOTT
+![newplot (1)](https://user-images.githubusercontent.com/23128332/58369284-e9c15580-7f00-11e9-8dbb-3ddd9b03138b.png)
 
 ## Wordcloud
 ```
@@ -407,7 +407,7 @@ wordcloud.generate(TEXT)
 plt.figure(figsize=(24,12))
 plt.imshow(wordcloud)
 ```
-CLOUDIMG
+![wordcld](https://user-images.githubusercontent.com/23128332/58369328-8edc2e00-7f01-11e9-9a87-49bda97d17e0.png)
 
 ## Word Frequency Plots
 ```
@@ -477,7 +477,7 @@ fig.append_trace(trace2, 1, 3)
 fig['layout'].update(height=1200, width=900, paper_bgcolor='rgb(233,233,233)', title="Word Count Plots")
 py.iplot(fig, filename='word-plots')
 ```
-WORDFQPLOT
+![newplot (2)](https://user-images.githubusercontent.com/23128332/58369285-ea59ec00-7f00-11e9-8f3f-6a9808905e13.png)
 
 ## Bigram Count Plots
 
@@ -508,7 +508,7 @@ fig.append_trace(trace1, 1, 2)
 fig['layout'].update(height=1200, width=900, paper_bgcolor='rgb(233,233,233)', title="Bigram Count Plots")
 py.iplot(fig, filename='word-plots')
 ```
-WORDFQPLOT
+![newplot (3)](https://user-images.githubusercontent.com/23128332/58369286-ea59ec00-7f00-11e9-8a84-60b4ccedca22.png)
 
 # Algorithm Training
 
@@ -576,13 +576,9 @@ AUC: 0.8921
 ```
 
 ```
-```
-sgdWeights
-
-```
 plot_learning_curve(logr,'Logistic Regression', X=X, y=y, n_jobs=4)
 ```
-Learning Curve
+![logrLC](https://user-images.githubusercontent.com/23128332/58369824-b5519780-7f08-11e9-8884-6ab247d0eeee.png)
 
 ## Stochastic Gradient Descent Classifier
 ```
@@ -612,14 +608,12 @@ F1_score : 91.86%
 AUC: 0.8904
 ```
 
-```
-```
-sgdWeights
+![sgdfeaturew](https://user-images.githubusercontent.com/23128332/58369814-97843280-7f08-11e9-8ad8-94783c986363.JPG)
 
 ```
 plot_learning_curve(sgd,'Logistic Regression', X=X, y=y, n_jobs=4)
 ```
-Learning Curve
+![SGDLR](https://user-images.githubusercontent.com/23128332/58369823-b5519780-7f08-11e9-9eb1-0fa0a2a2d34c.png)
 
 ## RandomForestClassifier
 ```
@@ -664,7 +658,7 @@ layout = go.Layout(title="RandomForest Feature Importances")
 fig = go.Figure(data=[trace], layout=layout)
 py.iplot(fig)
 ```
-Importance Graph
+![RF_FI](https://user-images.githubusercontent.com/23128332/58369287-ea59ec00-7f00-11e9-80a3-7d19effdd328.png)
 
 ## Lightgbm
 ```
@@ -698,7 +692,7 @@ AUC: 0.8679
 ```
 eli5.show_weights(lgb_model, vec=tfidf, top=50)
 ```
-lgbWeights
+![lgweights](https://user-images.githubusercontent.com/23128332/58370208-7d4c5380-7f0c-11e9-8193-3d90984094d3.JPG)
 
 ## Blending
 ```
@@ -792,3 +786,5 @@ Valid RMSLE: 0.198
 F1_score : 94.32% 
 ROC AUC: 0.9095
 ```
+
+![stackweights](https://user-images.githubusercontent.com/23128332/58369815-98b55f80-7f08-11e9-8b65-d4eac6cb3f26.JPG)
