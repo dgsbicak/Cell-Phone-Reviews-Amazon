@@ -825,6 +825,7 @@ Valid RMSLE: 0.198
 F1_score : 94.32% 
 ROC AUC: 0.9095
 ```
+Interestingly, logistic regression has the highest weight by far. 
 Output:
 
 ![stackweights](https://user-images.githubusercontent.com/23128332/58369815-98b55f80-7f08-11e9-8b65-d4eac6cb3f26.JPG)
