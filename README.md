@@ -834,7 +834,7 @@ Output:
 
 ## Things to do:
 ```
-1- Gather more data
+1- Gather more data and use 5 stars.
 2- Make research for better NLP techniques
 3- Feature engineering
 4- Model optimizations via gridsearch
