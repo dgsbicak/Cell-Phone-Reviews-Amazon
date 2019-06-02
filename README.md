@@ -1,5 +1,6 @@
 # Cell-Phone-Reviews-Amazon
 
+## Introduction
 I decided to do a NLP project for three main reasons:
 ```
 1-Text data is the cheapest and most abundant resource in the internet.
