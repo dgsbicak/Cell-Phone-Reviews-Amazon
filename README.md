@@ -834,11 +834,12 @@ Output:
 
 ## Things to do:
 ```
-1- Make research for better NLP techniques
-2- Feature engineering
-3- Model optimizations via gridsearch
-4- Apply neural networks
-5- More models for stacking
+1- Gather more data
+2- Make research for better NLP techniques
+3- Feature engineering
+4- Model optimizations via gridsearch
+5- Apply neural networks
+6- More models for stacking
 
 - Sentimental Analysis
 ```
