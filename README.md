@@ -826,7 +826,7 @@ Valid RMSLE: 0.198
 F1_score : 94.32% 
 ROC AUC: 0.9095
 ```
-Interestingly, logistic regression has the highest weight by far. 
+Logistic regression has the highest weight by far, and AUC score is lower than simple blending score. I could increase the score by optimizing parameters, or just by using another algorithm. But I feel like, if I invested my time for better preprocessing, It would be more beneficial in the long run.
 Output:
 
 ![stackweights](https://user-images.githubusercontent.com/23128332/58369815-98b55f80-7f08-11e9-8b65-d4eac6cb3f26.JPG)
@@ -837,8 +837,8 @@ Output:
 1- Gather more data and use 5 stars.
 2- Make research for better NLP techniques
 3- Feature engineering
-4- Model optimizations via gridsearch
-5- Apply neural networks
+4- Apply neural networks
+5- Model optimizations via gridsearch
 6- More models for stacking
 
 - Sentimental Analysis
