@@ -363,12 +363,36 @@ Some of the comments don't reflect the population; some of them are spams, some 
 df['textbool'] = df['textlength'].apply(lambda x: 1 if x<500 else 0)
 df = df[df['textbool']==1]
 ```
+## Brand Review Frequency
+Imbalanced, high tier brand review data might damage the generalization capability of models. However, I was limited with what Amazon presented to me, and choosed not to download ready made data.
+```
+trace= go.Bar(
+        x=brands.index,
+        y=brands.values,
+        marker=dict(
+            color=list(range(len(brands)))
+            ),
+        )
+layout = go.Layout(
+    title = 'Brand Review Frequency'
+    )
+
+data = [trace]
+fig = go.Figure(
+                data=data,
+                layout=layout
+               )
+py.iplot(fig)
+```
+Output:
+
+![newplot](https://user-images.githubusercontent.com/23128332/61597821-924c1700-ac1d-11e9-8d9f-0af4e09c14f9.png)
 
 ## Target Distribution
 
 ```
 starsfq = df['Stars'].value_counts()
-df['Stars'].value_counts()
+starsfq
 ```
 Output:
 ```
