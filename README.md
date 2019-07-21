@@ -115,6 +115,25 @@ def sorttext(x):
             x = " ".join(x[4:-2])
     return x
 
+def goBar(variables,name):
+    trace= go.Bar(
+            x=variables.index,
+            y=variables.values,
+            marker=dict(
+                color=list(range(len(variables)))
+                ),
+            )
+    layout = go.Layout(
+        title = name
+        )
+
+    data = [trace]
+    fig = go.Figure(
+                    data=data,
+                    layout=layout
+                   )
+    py.iplot(fig)
+
 def plot_learning_curve(estimator, title, X, y, ylim=None, cv=None,
                         n_jobs=1, train_sizes=np.linspace(.1, 1.0, 5)):
     plt.figure()
@@ -366,23 +385,24 @@ df = df[df['textbool']==1]
 ## Brand Review Frequency
 Imbalanced, high tier brand review data might damage the generalization capability of models. However, I was limited with what Amazon presented to me, and choosed not to download ready made data.
 ```
-trace= go.Bar(
-        x=brands.index,
-        y=brands.values,
-        marker=dict(
-            color=list(range(len(brands)))
-            ),
-        )
-layout = go.Layout(
-    title = 'Brand Review Frequency'
-    )
+brands = df['Phone Title'].apply(lambda x: x.upper().split()[0]).value_counts()[:8]
+brands
+```
+Output:
+```
+SAMSUNG       81579
+APPLE         56107
+LG            31870
+BLACKBERRY    17989
+VERIZON        3333
+HTC            1365
+XIAOMI         1028
+ONEPLUS         940
+Name: Phone Title, dtype: int64
+```
 
-data = [trace]
-fig = go.Figure(
-                data=data,
-                layout=layout
-               )
-py.iplot(fig)
+```
+goBar(brands, 'Brand Review Frequency')
 ```
 Output:
 
@@ -405,24 +425,7 @@ Name: Stars, dtype: int64
 ```
 
 ```
-trace = go.Bar(
-    x=starsfq.index,
-    y=starsfq.values,
-    marker=dict(
-        color=starsfq.values
-        ),
-    )
-
-layout = go.Layout(
-    title='Star Counts',
-    )
-
-data = [trace]
-fig = go.Figure(
-    data=data,
-    layout=layout
-    )
-py.iplot(fig, filename='StarCounts')
+goBar(starsfq, 'Star Counts')
 ```
 Output:
 
