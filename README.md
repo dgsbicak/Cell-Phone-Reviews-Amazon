@@ -7,7 +7,9 @@ I decided to do a NLP project for three main reasons:
 2-I wanted to gather my own data and use my knowledge on a real case.
 3-I will use the models here on other projects.
 ```
-I managed to gather almost 200k samples, and after preprocessing I was left with 180k samples in total. Since the amount of data I have was not enough for training an algorithm to successfully predict amongst 5 review stars I decided to create 'Positive Review' class by merging 5-4 starred comments, and a 'Negative Review' class by merging 1-2 starred comments. I didn't want to create a 'Neutral Review' class because 13296 sample size was not enough to train an algorithm to successfully predict, and It would further decrease the performance by increasing the complexity. Sample size numbers for review stars are shown below:
+I managed to gather almost 200k samples, and after preprocessing I was left with 180k samples in total. The amount of data was not enough for training an algorithm to successfully predict each 5 review stars. 2 classes was created; 'Positive Review' class by merging 5-4 starred comments, and a 'Negative Review' class by merging 1-2 starred comments. 'Neutral Review' class (3 stars) wasn't used because 13296 sample size was not enough to successfully train an algorithm.
+Both stemming and lemmatizing didn't yield better results, due to diminished information in the data, that is why they are not presented in current project.
+Sample size numbers for review stars are shown below:
 ```
     5    100006
     1     40217
@@ -861,8 +863,8 @@ Output:
 
 ## Things to do:
 ```
-1- Gather more data and use 5 stars.
-2- Make research for better NLP techniques
+1- Gather more data and train to predict each 5 star.
+2- Make research for better NLP techniques. Experiment more on stemming and lemmatizing.
 3- Feature engineering
 4- Apply neural networks
 5- Model optimizations via gridsearch
