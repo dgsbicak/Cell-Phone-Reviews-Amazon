@@ -117,10 +117,12 @@ def sorttext(x):
             x = " ".join(x[4:-2])
     return x
 
-def goBar(variables,name):
+def goBar(variables,name,text=None):
     trace= go.Bar(
             x=variables.index,
             y=variables.values,
+            text = text,
+            textposition = 'auto',
             marker=dict(
                 color=list(range(len(variables)))
                 ),
@@ -236,6 +238,38 @@ output:
  'Helpful',
  'Comment Report abuse']
 ```
+
+## Gender Ratio
+```
+"""
+https://github.com/MatthiasWinkelmann/firstname-database
+
+F female
+1F female if first part of name, otherwise mostly male
+?F mostly female
+M male
+1M male if first part of name, otherwise mostly female
+?M mostly male
+? unisex
+"""
+gnames = pd.read_csv("firstnames.csv",sep=';', usecols=['name', 'gender'])
+gnames.dropna(axis=0,inplace=True)
+gnames['name'] = gnames['name'].apply(lambda x: x.lower())
+gnames.columns = ['fname', 'gender']
+gnames.drop_duplicates(subset=['fname'],inplace=True)
+
+gnames.gender = gnames.gender.apply(lambda x: 'F' if 'F' in x else ('M' if 'M' in x else ('U' if x=='?' else '???')))
+
+df['fname'] = df['Name'].apply(lambda x: x.lower() if len(x.split())<2 else x.split()[0].lower())  # Leave the first name (for the most cases)
+
+df = pd.merge(df,gnames, how='left', on='fname')
+
+gg = df['gender'].value_counts()
+#M : 56%
+#F : 42%
+#U : 2%
+```
+![newplot (1)](https://user-images.githubusercontent.com/23128332/63115439-dbcf1e00-bf9f-11e9-859b-e2924698b23a.png)
 
 ## Preprocessing
 ```
