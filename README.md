@@ -7,8 +7,8 @@ I decided to do a NLP project for three main reasons:
 2-I wanted to gather my own data and use my knowledge on a real case.
 3-I will use the models here on other projects.
 ```
-I managed to gather almost 200k samples, and after preprocessing I was left with 180k samples in total. The amount of data was not enough for training an algorithm to successfully predict each 5 review stars. 2 classes was created; 'Positive Review' class by merging 5-4 starred comments, and a 'Negative Review' class by merging 1-2 starred comments. 'Neutral Review' class (3 stars) wasn't used because 13296 sample size was not enough to successfully train an algorithm.
-Both stemming and lemmatizing didn't yield better results, due to diminished information in the data, that is why they are not presented in current project.
+I managed to gather almost 200k samples, and after preprocessing I was left with 180k samples in total.
+Both stemming and lemmatizing didn't yield better results due to diminished information in the data, that is why they are not presented in current project.
 Sample size numbers for review stars are shown below:
 ```
     5    100006
@@ -170,26 +170,50 @@ def plot_learning_curve(estimator, title, X, y, ylim=None, cv=None,
     plt.savefig('learningcurves.png')
     return plt
 
+def goBar(variables,name,text=None):
+    trace= go.Bar(
+            x=variables.index,
+            y=variables.values,
+            text=text,
+            textposition='auto',
+            marker=dict(
+                color=list(range(len(variables)))
+                ),
+            )
+    layout = go.Layout(
+        title = name
+        )
+
+    data = [trace]
+    fig = go.Figure(
+                    data=data,
+                    layout=layout
+                   )
+    py.iplot(fig)
+
 def model_eval(model, k=5, seed=0):
-    kfold = StratifiedKFold(k, random_state=seed)
-    
-    oof = np.zeros(len(y))
+    kfold = KFold(k, random_state=seed)
+    oof = np.zeros(y.shape[0])
     for nfold, (train_ix, valid_ix) in enumerate(kfold.split(X,y)):
         trainX, validX = X[train_ix], X[valid_ix]
         trainy, validy = y[train_ix], y[valid_ix]
-
+        
         model.fit(trainX, trainy)
         p = model.predict(validX)
         oof[valid_ix] = p
-        
-        print('Fold{}, Valid AUC: {:.4f}'.format(nfold,roc_auc_score(validy, p)))
+        if len(y.unique())==2:
+            print('Fold{}, Valid AUC: {:.4f}'.format(nfold,roc_auc_score(validy, p)))
+        else:
+            print('Fold{}, F1_score : {:.2%}'.format(nfold,f1_score(validy, p, average='micro')))
         
     print(confusion_matrix(y, oof))
     print(classification_report(y, oof))
     print('Valid RMSLE: {:.3f}'.format(np.sqrt(mean_squared_log_error(y, oof))))
     print("F1_score : {:.2%} ".format(f1_score(y, oof, average='micro')))  # 'samples', 'weighted', 'macro', 'micro', 'binary'
-    print('AUC: {:.4f}'.format(roc_auc_score(y, oof)))
     
+    if len(y.unique())==2:
+        print('AUC: {:.4f}'.format(roc_auc_score(y, oof)))
+
     return model, oof
 ```
 
@@ -268,6 +292,8 @@ gg = df['gender'].value_counts()
 #M : 56%
 #F : 42%
 #U : 2%
+
+goBar(gg,'Gender Bar',text=['56%','42%','2%'])
 ```
 ![newplot (1)](https://user-images.githubusercontent.com/23128332/63115439-dbcf1e00-bf9f-11e9-859b-e2924698b23a.png)
 
@@ -319,17 +345,14 @@ brands = list(map(lambda x: x.lower().strip(),set(brands)))
 t0 = time.time()
 print("Preprocessing Comments..","\n")
 
-# If the 'Title' column contain NaNs, replace them.
-if df['Title'].isna().sum()==0:
-    print("NaNs in Title: ",df['Title'].isna().sum())
-    df['Title'] = df['Title'].apply(lambda x: "" if isinstance(x,float) else x)
-
-
 # Merge Comments and Titles
 df['Text'] = df['Text']+' '+df['Title']
+df = df[['Text','Stars','Phone Title']]
 
-# Leave only two columns
-df = df[['Text','Stars']]
+# Drop NANs
+if df.isna().sum().sum()!=0:
+    print("NANs in DF:\n",df.isna().sum())
+    df.dropna(axis=0,inplace=True)
 
 # Delete Unnecessary Text
 df['Text'] = df['Text'].apply(lambda x: x.replace('Verified Purchase',""))
@@ -616,7 +639,7 @@ df.reset_index(drop=True, inplace=True)
 ```
 
 ## Vectorization
-### CountVectorizer
+### TfidfVectorizer
 ```
 text = df['Text']
 tfidf = TfidfVectorizer(token_pattern=r'\w{2,}',
@@ -646,25 +669,30 @@ logr, logr_preds = model_eval(logr)
 ```
 Output:
 ```
-Fold0, Valid AUC: 0.9176
-Fold1, Valid AUC: 0.8852
-Fold2, Valid AUC: 0.8683
-Fold3, Valid AUC: 0.8976
-Fold4, Valid AUC: 0.8917
-[[ 42680   8992]
- [  5226 119792]]
+Fold0, F1_score : 73.80%
+Fold1, F1_score : 69.89%
+Fold2, F1_score : 67.15%
+Fold3, F1_score : 70.31%
+Fold4, F1_score : 68.89%
+[[32844  1790  1477   588  3129]
+ [ 6381  1179  1586   614  1600]
+ [ 3645   982  2826  2026  3675]
+ [ 1690   375  2162  4954 15558]
+ [ 2610   318  1173  4945 89678]]
               precision    recall  f1-score   support
 
-         0.0       0.89      0.83      0.86     51672
-         1.0       0.93      0.96      0.94    125018
+           1       0.70      0.82      0.76     39828
+           2       0.25      0.10      0.15     11360
+           3       0.31      0.21      0.25     13154
+           4       0.38      0.20      0.26     24739
+           5       0.79      0.91      0.84     98724
 
-   micro avg       0.92      0.92      0.92    176690
-   macro avg       0.91      0.89      0.90    176690
-weighted avg       0.92      0.92      0.92    176690
+    accuracy                           0.70    187805
+   macro avg       0.48      0.45      0.45    187805
+weighted avg       0.65      0.70      0.67    187805
 
-Valid RMSLE: 0.197
-F1_score : 91.95% 
-AUC: 0.8921
+Valid RMSLE: 0.289
+F1_score : 70.01% 
 ```
 
 ```
@@ -676,30 +704,35 @@ Output:
 
 ## Stochastic Gradient Descent Classifier
 ```
-model = SGDClassifier(loss='modified_huber')
+model = SGDClassifier(loss='hinge', penalty='l2',alpha=1e-3, max_iter=5, tol=None)
 sgd, sgd_preds = model_eval(model)
 ```
 Output:
 ```
-Fold0, Valid AUC: 0.9173
-Fold1, Valid AUC: 0.8821
-Fold2, Valid AUC: 0.8668
-Fold3, Valid AUC: 0.8969
-Fold4, Valid AUC: 0.8891
-[[ 42512   9160]
- [  5231 119787]]
+Fold0, F1_score : 61.67%
+Fold1, F1_score : 60.03%
+Fold2, F1_score : 55.43%
+Fold3, F1_score : 62.26%
+Fold4, F1_score : 61.76%
+[[14683    16     6     5 25118]
+ [ 2239    11     8     6  9096]
+ [ 1136     7    26    15 11970]
+ [  323     6    19     8 24383]
+ [  305     5    13    14 98387]]
               precision    recall  f1-score   support
 
-         0.0       0.89      0.82      0.86     51672
-         1.0       0.93      0.96      0.94    125018
+           1       0.79      0.37      0.50     39828
+           2       0.24      0.00      0.00     11360
+           3       0.36      0.00      0.00     13154
+           4       0.17      0.00      0.00     24739
+           5       0.58      1.00      0.74     98724
 
-   micro avg       0.92      0.92      0.92    176690
-   macro avg       0.91      0.89      0.90    176690
-weighted avg       0.92      0.92      0.92    176690
+    accuracy                           0.60    187805
+   macro avg       0.43      0.27      0.25    187805
+weighted avg       0.53      0.60      0.49    187805
 
-Valid RMSLE: 0.198
-F1_score : 91.86% 
-AUC: 0.8904
+Valid RMSLE: 0.456
+F1_score : 60.23% 
 ```
 Output:
 
@@ -712,29 +745,105 @@ Output:
 
 ![SGDLR](https://user-images.githubusercontent.com/23128332/58369823-b5519780-7f08-11e9-9eb1-0fa0a2a2d34c.png)
 
+## Support Vector Machine Classifier
+```
+from sklearn.svm import LinearSVC
+svc = LinearSVC()
+svc, svc_preds = model_eval(svc)
+```
+Output:
+```
+Fold0, F1_score : 74.92%
+Fold1, F1_score : 70.66%
+Fold2, F1_score : 68.32%
+Fold3, F1_score : 71.24%
+Fold4, F1_score : 70.38%
+[[34423   522   481   501  3901]
+ [ 7557   469   545   557  2232]
+ [ 4804   396  1147  1796  5011]
+ [ 2063   155   679  3419 18423]
+ [ 2193    92   284  2074 94081]]
+              precision    recall  f1-score   support
+
+           1       0.67      0.86      0.76     39828
+           2       0.29      0.04      0.07     11360
+           3       0.37      0.09      0.14     13154
+           4       0.41      0.14      0.21     24739
+           5       0.76      0.95      0.85     98724
+
+    accuracy                           0.71    187805
+   macro avg       0.50      0.42      0.40    187805
+weighted avg       0.64      0.71      0.65    187805
+
+Valid RMSLE: 0.296
+F1_score : 71.11% 
+```
+
+# MultinomialNB()
+```
+from sklearn.naive_bayes import MultinomialNB
+MNB = MultinomialNB()
+MNB, MNB_preds = model_eval(MNB)
+```
+Output:
+```
+Fold0, F1_score : 64.68%
+Fold1, F1_score : 62.46%
+Fold2, F1_score : 59.67%
+Fold3, F1_score : 64.65%
+Fold4, F1_score : 63.92%
+[[19969     0     0     0 19859]
+ [ 3022     0     0     0  8338]
+ [ 1262     0     0     0 11892]
+ [  278     0     0     1 24460]
+ [  234     0     0     0 98490]]
+              precision    recall  f1-score   support
+
+           1       0.81      0.50      0.62     39828
+           2       0.00      0.00      0.00     11360
+           3       0.00      0.00      0.00     13154
+           4       1.00      0.00      0.00     24739
+           5       0.60      1.00      0.75     98724
+
+    accuracy                           0.63    187805
+   macro avg       0.48      0.30      0.27    187805
+weighted avg       0.62      0.63      0.53    187805
+
+Valid RMSLE: 0.415
+F1_score : 63.08% 
+```
+
+
 ## RandomForestClassifier
 ```
 tree = RandomForestClassifier(verbose=1, n_jobs=-1)
 tree , tree_preds = model_eval(tree,k=2)
 ```
+Output:
 ```
-Fold1, Valid AUC: 0.8536
-[[ 38910  12762]
- [  7222 117796]]
+Fold0, F1_score : 66.86%
+Fold1, F1_score : 66.16%
+[[30886   588   587   433  7334]
+ [ 6966   282   382   271  3459]
+ [ 5177   268   575   651  6483]
+ [ 3298   155   451  1137 19698]
+ [ 4503   184   366  1636 92035]]
               precision    recall  f1-score   support
 
-         0.0       0.84      0.75      0.80     51672
-         1.0       0.90      0.94      0.92    125018
+           1       0.61      0.78      0.68     39828
+           2       0.19      0.02      0.04     11360
+           3       0.24      0.04      0.07     13154
+           4       0.28      0.05      0.08     24739
+           5       0.71      0.93      0.81     98724
 
-   micro avg       0.89      0.89      0.89    176690
-   macro avg       0.87      0.85      0.86    176690
-weighted avg       0.89      0.89      0.88    176690
+    accuracy                           0.67    187805
+   macro avg       0.41      0.36      0.34    187805
+weighted avg       0.57      0.67      0.59    187805
 
-Valid RMSLE: 0.233
-F1_score : 88.69% 
-AUC: 0.8476
-Wall time: 19min 14s
+Valid RMSLE: 0.367
+F1_score : 66.51% 
 ```
+
 ```
 std = np.std([ree.feature_importances_ for ree in tree.estimators_], axis=0).astype(np.float32)
 imps = pd.DataFrame({
@@ -769,25 +878,30 @@ lgb_model, lgb_preds = model_eval(model)
 ```
 Output:
 ```
-Fold0, Valid AUC: 0.8959
-Fold1, Valid AUC: 0.8629
-Fold2, Valid AUC: 0.8474
-Fold3, Valid AUC: 0.8698
-Fold4, Valid AUC: 0.8636
-[[ 40526  11146]
- [  6054 118964]]
+Fold0, F1_score : 73.40%
+Fold1, F1_score : 69.64%
+Fold2, F1_score : 66.97%
+Fold3, F1_score : 69.97%
+Fold4, F1_score : 69.09%
+[[32049   354   518   673  6234]
+ [ 6715   384   633   680  2948]
+ [ 4184   284  1361  1790  5535]
+ [ 1999   133   673  3569 18365]
+ [ 2709    79   278  1908 93750]]
               precision    recall  f1-score   support
 
-         0.0       0.87      0.78      0.82     51672
-         1.0       0.91      0.95      0.93    125018
+           1       0.67      0.80      0.73     39828
+           2       0.31      0.03      0.06     11360
+           3       0.39      0.10      0.16     13154
+           4       0.41      0.14      0.21     24739
+           5       0.74      0.95      0.83     98724
 
-   micro avg       0.90      0.90      0.90    176690
-   macro avg       0.89      0.87      0.88    176690
-weighted avg       0.90      0.90      0.90    176690
+    accuracy                           0.70    187805
+   macro avg       0.51      0.41      0.40    187805
+weighted avg       0.63      0.70      0.64    187805
 
-Valid RMSLE: 0.216
-F1_score : 90.27% 
-AUC: 0.8679
+Valid RMSLE: 0.326
+F1_score : 69.81% 
 ```
 ```
 eli5.show_weights(lgb_model, vec=tfidf, top=50)
@@ -796,113 +910,216 @@ Output:
 
 ![lgweights](https://user-images.githubusercontent.com/23128332/58370208-7d4c5380-7f0c-11e9-8193-3d90984094d3.JPG)
 
-## Blending
+# Neural Networks
 ```
-# Simple Averaging
-blend = (logr_preds + sgd_preds + tree_preds + lgb_preds)/4
-print('Valid RMSLE: {:.4f}'.format(np.sqrt(mean_squared_log_error(y, blend))))
-print('AUC: {:.4f}'.format(roc_auc_score(y, blend)))
+from keras import layers
+from keras.models import Sequential
+from keras.optimizers import Adam
+import tensorflow as tf
+
+gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.7)
+gpu_name = tf.test.gpu_device_name()
+session_conf = tf.ConfigProto(intra_op_parallelism_threads=44,
+                             inter_op_parallelism_threads=44,
+                             allow_soft_placement=True,
+                             gpu_options=gpu_options)
+sess = tf.Session(graph=tf.get_default_graph(),
+                 config=session_conf)
+session_conf.gpu_options.allow_growth=True
+
+def build_model():
+    embed_dim = 50
+    nlabels=5
+    nlayer = 1
+    hidden_u = 128
+    attention_u = 64
+
+    model = Sequential()
+    model.add(layers.embeddings.Embedding(xtrain.shape[1], embed_dim))
+    model.add(layers.GRU(units=hidden_u, dropout=0.5, recurrent_dropout=0.2))
+    model.add(layers.Dense(attention_u, activation = 'tanh'))
+    """
+    model.add(layers.Dropout(0.25))
+    model.add(layers.Dense(1, activation = None))
+    model.add(layers.Dense(attention_u, activation = 'softmax'))
+    """
+    model.add(layers.Dense(nlabels, activation='sigmoid'))
+    model.compile(loss='categorical_crossentropy',
+                 optimizer='adam',
+                 metrics=['categorical_accuracy'])
+    return model
+
+batch=512
+epoch=5
+k = 5
+kfold = KFold(k, random_state=0)
+
+tokenizer = text.Tokenizer()
+tokenizer.fit_on_texts(X)
+
+ohe = OneHotEncoder()
+ohe.fit(y.values.reshape(-1,1))
+
+NN_preds = np.zeros((y.shape[0], len(y.unique())))
+for nfold, (train_ix, test_ix) in enumerate(kfold.split(X,y)):
+    print(f"\nFold {nfold+1}/{k}, ... ")
+    xtrain, xtest = X[train_ix], X[test_ix]
+    ytrain, ytest = y[train_ix], y[test_ix]
+    
+    xtrain = tokenizer.texts_to_sequences(xtrain)
+    xtest  = tokenizer.texts_to_sequences(xtest)
+    xtrain = sequence.pad_sequences(xtrain)
+    xtest = sequence.pad_sequences(xtest)
+    
+    ytrain = ohe.transform(ytrain.values.reshape(-1,1))
+    ytest = ohe.transform(ytest.values.reshape(-1,1))
+    
+    model = build_model()
+    history = model.fit(xtrain, ytrain,
+                        validation_split=0.1,
+                       epochs=epoch,
+                       batch_size=batch)
+    score, acc = model.evaluate(xtest, ytest,
+                               batch_size=batch)
+    print(f"{nfold+1}th fold, Score: %.2f, Accuracy: %.2f" % (score,acc))
+    NN_preds[test_ix] = model.predict(xtest)
+
+ytest = ohe.transform(y.values.reshape(-1,1)).toarray()
+print('Valid RMSLE: {:.3f}'.format(np.sqrt(mean_squared_log_error(ytest, NN_preds))))
+print("F1_score : {:.2%} ".format(f1_score(np.argmax(ytest, axis=1)+1, np.argmax(NN_preds, axis=1)+1, average='micro')))
+print('ROC AUC: {:.2f}'.format(roc_auc_score(ytest, NN_preds)))
+print("Accuracy: {:.2f}".format(accuracy_score(np.argmax(ytest, axis=1)+1, np.argmax(NN_preds, axis=1)+1)))
+print(confusion_matrix(np.argmax(ytest, axis=1)+1, np.argmax(NN_preds, axis=1)+1))
+print(classification_report(np.argmax(ytest, axis=1)+1, np.argmax(NN_preds, axis=1)+1))
 ```
 Output:
 ```
-Valid RMSLE: 0.1860
-AUC: 0.9222
+[[29159     0    76   353 10240]
+ [ 6675     1   100   329  4255]
+ [ 5008     2   130   679  7335]
+ [ 3162     0   107  1024 20446]
+ [ 5956     0    45   723 92000]]
+              precision    recall  f1-score   support
+
+           1       0.58      0.73      0.65     39828
+           2       0.33      0.00      0.00     11360
+           3       0.28      0.01      0.02     13154
+           4       0.33      0.04      0.07     24739
+           5       0.69      0.93      0.79     98724
+
+    accuracy                           0.65    187805
+   macro avg       0.44      0.34      0.31    187805
+weighted avg       0.57      0.65      0.56    187805
+
+Valid RMSLE: 0.238
+F1_score : 65.13% 
+ROC AUC: 0.78
+Accuracy: 0.65
+```
+
+## Blending
+```
+# Simple Averaging
+blend = (svc_preds + sgd_preds + MNB_preds + tree_preds + lgb_preds + (np.argmax(NN_preds,axis=1)+1))/6
+blend = pd.Series(map(round,blend))
+print('Valid RMSLE: {:.2f}'.format(np.sqrt(mean_squared_log_error(y, blend))))
+print('F1_score : {:.2%}'.format(f1_score(y, blend, average='micro')))
+
+hoter = lambda array: ohe.transform(array.values.reshape(-1,1)).toarray()
+print('AUC: {:.2f}'.format(roc_auc_score(hoter(y), hoter(blend))))
+```
+Output:
+```
+Valid RMSLE: 0.30
+F1_score : 58.95%
+AUC: 0.63
 ```
 
 ### Voting Classifier
 ```
 from sklearn.ensemble import VotingClassifier
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=0)
 
-blender = VotingClassifier(estimators=[('logr',logr),
-                                     ('SGD',sgd),
+voter = VotingClassifier(estimators=[('SGD',sgd),
+                                     ('SVC',svc),
+                                     ('MNB',MNB),
                                      ('tree',tree),
-                                     ('lgb',lgb_model)],
-                         voting='hard'                         
-                        )
-blender, blend_preds = model_eval(blender)
+                                     ('lgb',lgb_model),
+                                    ('GRU',model)],
+                            voting='hard')
+
+voter, voter_preds = model_eval(voter)
 ```
-Simple averaging gives much better performance than voting classifier. Simple blend predictions will be used in the Stacking stage.
+
 Output:
 ```
-Fold0, Valid AUC: 0.9202
-Fold1, Valid AUC: 0.8893
-Fold2, Valid AUC: 0.8712
-Fold3, Valid AUC: 0.9018
-Fold4, Valid AUC: 0.8949
-[[ 43341   8331]
- [  5970 119048]]
-              precision    recall  f1-score   support
 
-         0.0       0.88      0.84      0.86     51672
-         1.0       0.93      0.95      0.94    125018
-
-   micro avg       0.92      0.92      0.92    176690
-   macro avg       0.91      0.90      0.90    176690
-weighted avg       0.92      0.92      0.92    176690
-
-Valid RMSLE: 0.197
-F1_score : 91.91% 
-AUC: 0.8955
 ```
 
 ## Stacking
 ```
-stacked_df = pd.DataFrame({
+stacked_preds = pd.DataFrame({
     'logr_preds':logr_preds,
     'sgd_preds':sgd_preds,
+    'svc_preds':svc_preds,
+    'MNB_preds':MNB_preds,
     'tree_preds':tree_preds,
     'lgb_preds':lgb_preds,
-    'blend_preds':blend
+    'blend_preds':blend,
+    'NN_preds':np.argmax(NN_preds, axis=1)+1
 })
+
+stacked_preds.to_csv('stacked_preds.csv',index=False)
 ```
 ### Stacking with XGBoost Classifier
 ```
 from xgboost import XGBClassifier
+s_train, s_test, y_train, y_test = train_test_split(stacked_preds, y, test_size=0.2, random_state=10)
 
-s_train, s_test, y_train, y_test = train_test_split(stacked_df, y, test_size=0.3, random_state=1)
-
-xgb = XGBClassifier()
+xgb = XGBClassifier(n_jobs=-1)
 xgb.fit(s_train,y_train)
 stack_pred = xgb.predict(s_test)
 
 print(confusion_matrix(stack_pred, y_test))
 print(classification_report(stack_pred, y_test))
 print('Valid RMSLE: {:.3f}'.format(np.sqrt(mean_squared_log_error(stack_pred, y_test))))
-print("F1_score : {:.2%} ".format(f1_score(stack_pred, y_test)))
-print('ROC AUC: {:.4f}'.format(roc_auc_score(stack_pred, y_test))
+print("F1_score : {:.2%} ".format(f1_score(y_test, stack_pred, average='micro')))
+print('ROC AUC: {:.2f}'.format(roc_auc_score(onehotter(np.array(y_test)),onehotter(np.array(stack_pred)))))
 ```
 Output:
 ```
-[[12808  1582]
- [ 2741 35876]]
+[[ 7027  1550   964   431   475]
+ [   24    44    15     6     1]
+ [  188   233   434   244    87]
+ [   87   103   376   803   491]
+ [  669   359   858  3472 18620]]
               precision    recall  f1-score   support
 
-         0.0       0.82      0.89      0.86     14390
-         1.0       0.96      0.93      0.94     38617
+           1       0.88      0.67      0.76     10447
+           2       0.02      0.49      0.04        90
+           3       0.16      0.37      0.23      1186
+           4       0.16      0.43      0.24      1860
+           5       0.95      0.78      0.85     23978
 
-   micro avg       0.92      0.92      0.92     53007
-   macro avg       0.89      0.91      0.90     53007
-weighted avg       0.92      0.92      0.92     53007
+    accuracy                           0.72     37561
+   macro avg       0.43      0.55      0.42     37561
+weighted avg       0.86      0.72      0.78     37561
 
-Valid RMSLE: 0.198
-F1_score : 94.32% 
-ROC AUC: 0.9095
+Valid RMSLE: 0.290
+F1_score : 71.69% 
+ROC AUC: 0.67
 ```
-Logistic regression has the highest weight by far, and AUC score is lower than simple blending score. I could increase the score by optimizing parameters, or just by using another algorithm. But I feel like, if I invested my time for better preprocessing, It would be more beneficial in the long run.
+
 Output:
 
-![stackweights](https://user-images.githubusercontent.com/23128332/58369815-98b55f80-7f08-11e9-8b65-d4eac6cb3f26.JPG)
 
 
 ## Things to do:
 ```
-1- Gather more data and train to predict each 5 star.
-2- Make research for better NLP techniques. Experiment more on stemming and lemmatizing.
+1- Gather more data.
+2- Make research for better NLP techniques.
 3- Feature engineering
-4- Apply neural networks
-5- Model optimizations via gridsearch
-6- More models for stacking
+4- Model optimizations
+5- More models for stacking
 
 - Sentimental Analysis
 ```
