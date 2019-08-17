@@ -668,7 +668,6 @@ plot_learning_curve(logr,'Logistic Regression', X=X, y=y, n_jobs=4)
 ```
 Output:
 
-![logrLC](https://user-images.githubusercontent.com/23128332/58369824-b5519780-7f08-11e9-8884-6ab247d0eeee.png)
 
 ## Stochastic Gradient Descent Classifier
 ```
@@ -704,14 +703,12 @@ F1_score : 60.23%
 ```
 Output:
 
-![sgdfeaturew](https://user-images.githubusercontent.com/23128332/58369814-97843280-7f08-11e9-8ad8-94783c986363.JPG)
 
 ```
 plot_learning_curve(sgd,'Logistic Regression', X=X, y=y, n_jobs=4)
 ```
 Output:
 
-![SGDLR](https://user-images.githubusercontent.com/23128332/58369823-b5519780-7f08-11e9-9eb1-0fa0a2a2d34c.png)
 
 ## Support Vector Machine Classifier
 ```
