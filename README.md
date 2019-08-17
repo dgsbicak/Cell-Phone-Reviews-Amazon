@@ -606,17 +606,6 @@ Output:
 
 # Algorithm Training
 
-## Target Feature: Satisfaction 
-Since the data I mined doesn't contain enough sample to train algorithms to predict 2,3,4 starred comments, I decided to seperate the data into two segments, positive and negative comments, by naming 5 and 4 starred comments "1" and 1 and 2 starred comments "0".
-```
-df['Stars'] = df['Stars'].astype(float)
-# Negative, Positive, Neutr Comments
-df['Satisfaction'] = df['Stars'].apply(lambda x: 0 if x<=2 else (1 if x>=4 else 2))
-df = df[df['Satisfaction']!=2]
-len(df[df['Satisfaction']==0]),len(df[df['Satisfaction']==1])
-df.reset_index(drop=True, inplace=True)
-```
-
 ## Vectorization
 ### TfidfVectorizer
 ```
