@@ -117,27 +117,6 @@ def sorttext(x):
             x = " ".join(x[4:-2])
     return x
 
-def goBar(variables,name,text=None):
-    trace= go.Bar(
-            x=variables.index,
-            y=variables.values,
-            text = text,
-            textposition = 'auto',
-            marker=dict(
-                color=list(range(len(variables)))
-                ),
-            )
-    layout = go.Layout(
-        title = name
-        )
-
-    data = [trace]
-    fig = go.Figure(
-                    data=data,
-                    layout=layout
-                   )
-    py.iplot(fig)
-
 def plot_learning_curve(estimator, title, X, y, ylim=None, cv=None,
                         n_jobs=1, train_sizes=np.linspace(.1, 1.0, 5)):
     plt.figure()
