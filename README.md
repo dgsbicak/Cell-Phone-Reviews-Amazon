@@ -668,6 +668,14 @@ plot_learning_curve(logr,'Logistic Regression', X=X, y=y, n_jobs=4)
 ```
 Output:
 
+![LogR](https://user-images.githubusercontent.com/23128332/63217652-d7973200-c152-11e9-9d4d-18f852b6aac9.JPG)
+```
+eli5.show_weights(logr, vec=tfidf, top=40)
+```
+Output:
+
+![logwords](https://user-images.githubusercontent.com/23128332/63217653-d7973200-c152-11e9-835d-1a4b293afafd.JPG)
+
 
 ## Stochastic Gradient Descent Classifier
 ```
@@ -701,13 +709,18 @@ weighted avg       0.53      0.60      0.49    187805
 Valid RMSLE: 0.456
 F1_score : 60.23% 
 ```
-Output:
-
 
 ```
 plot_learning_curve(sgd,'Logistic Regression', X=X, y=y, n_jobs=4)
 ```
 Output:
+![SGD](https://user-images.githubusercontent.com/23128332/63217654-d7973200-c152-11e9-89bd-5e78205b6e14.JPG)
+
+```
+eli5.show_weights(sgd, vec=tfidf, top=40)
+```
+Output:
+![sgdWords](https://user-images.githubusercontent.com/23128332/63217655-d82fc880-c152-11e9-9f46-052fcf54a650.JPG)
 
 
 ## Support Vector Machine Classifier
@@ -830,8 +843,7 @@ fig = go.Figure(data=[trace], layout=layout)
 py.iplot(fig)
 ```
 Output:
-
-![RF_FI](https://user-images.githubusercontent.com/23128332/58369287-ea59ec00-7f00-11e9-80a3-7d19effdd328.png)
+![Forest](https://user-images.githubusercontent.com/23128332/63217651-d7973200-c152-11e9-8bcf-2d8cebd924fe.JPG)
 
 ## Lightgbm
 ```
@@ -1075,7 +1087,7 @@ ROC AUC: 0.67
 ```
 
 Output:
-
+![stacked](https://user-images.githubusercontent.com/23128332/63217656-d82fc880-c152-11e9-8081-50a643e768cb.JPG)
 
 
 ## Things to do:
