@@ -198,11 +198,9 @@ def model_eval(model, k=5, seed=0):
 
 ## Read the merged data
 ```
-data = pd.read_csv('AMAZON_comments_yuge.csv')
-print(data.info())
-data = data.drop_duplicates(subset='Text', keep=False)
-data.reset_index(inplace=True,drop=True)
-df = data.copy()
+df = pd.read_csv('AMAZON_comments_yuge.csv')
+df = df.drop_duplicates(subset='Text', keep=False)
+df.reset_index(inplace=True,drop=True)
 print(df.info())
 ```
 Output:
@@ -218,35 +216,61 @@ memory usage: 4.6+ MB
 None
 ```
 
-### A sample from the data
+## Gather phone model names from the data
 ```
-df['Text'][85101]
-```
-output:
-```
-'Kenneth B.\r\r\nFive Stars\r\r\nJune 5, 2016\r\r\nStyle: U.S. Version (LGUS991)Verified Purchase\r\r\nNice phone\r\r\nHelpful\r\r\nComment Report abuse'
+modellist = list(set(df['Phone Title'].values))
+modellist = list(map(lambda model: ''.join([e for e in model if e not in set(string.punctuation)]),modellist))
+brands = []
+models_1 = []
+models_2 = []
+for model in modellist:
+    if len(model.split())>3:
+        brand = model.split()[0]
+        brands.append(brand)
+
+        m = model.split()[1]
+        models_1.append(m)
+
+        m = model.split()[2]
+        models_2.append(m)
+    else:pass
+models_1 = set(map(lambda x: x.lower().strip(),set(models_1)))
+models_2 = set(map(lambda x: x.lower().strip(),set(models_2)))
+models = list(models_1.union(models_2))# Merge the two models set, because they contain some duplicate names.
+brands = list(map(lambda x: x.lower().strip(),set(brands)))
 ```
 
-If we split the example from the parts where '\r\r\n' exists, we sort the Text data much easier.
+## Brand Review Frequency
+Imbalanced, high tier brand review data might damage the generalization capability of models. However, I was limited with what Amazon presented to me, and choosed not to download ready made data.
 ```
-df['Text'][85101].split('\r\r\n')
+brands = df['Phone Title'].apply(lambda x: x.upper().split()[0]).value_counts()[:8]
+brands
 ```
-output:
+Output:
 ```
-['Kenneth B.',
- 'Five Stars',
- 'June 5, 2016',
- 'Style: U.S. Version (LGUS991)Verified Purchase',
- 'Nice phone',
- 'Helpful',
- 'Comment Report abuse']
+SAMSUNG       81579
+APPLE         56107
+LG            31870
+BLACKBERRY    17989
+VERIZON        3333
+HTC            1365
+XIAOMI         1028
+ONEPLUS         940
+Name: Phone Title, dtype: int64
 ```
+
+```
+goBar(brands, 'Brand Review Frequency')
+```
+Output:
+
+![newplot](https://user-images.githubusercontent.com/23128332/61597821-924c1700-ac1d-11e9-8d9f-0af4e09c14f9.png)
 
 ## Gender Ratio
+The data doesn't contain information about genders of the reviewers. A firstname database will be used to estimate genders from firstnames. This approach can provide an approximate gender ratio information.
 ```
 """
 https://github.com/MatthiasWinkelmann/firstname-database
-
 F female
 1F female if first part of name, otherwise mostly male
 ?F mostly female
@@ -276,109 +300,100 @@ goBar(gg,'Gender Bar',text=['56%','42%','2%'])
 ```
 ![newplot (1)](https://user-images.githubusercontent.com/23128332/63115439-dbcf1e00-bf9f-11e9-859b-e2924698b23a.png)
 
-## Preprocessing
+### A sample from the text data
 ```
-# Clean some of the repetitive words.
-df['Text'] = df['Text'].apply(clean_int2)  # Clean any integer value
+df['Text'][85101]
+```
+output:
+```
+'Kenneth B.\r\r\nFive Stars\r\r\nJune 5, 2016\r\r\nStyle: U.S. Version (LGUS991)Verified Purchase\r\r\nNice phone\r\r\nHelpful\r\r\nComment Report abuse'
+```
+
+If we split the example from the parts where '\r\r\n' exists, we sort the Text data much easier.
+```
+df['Text'][85101].split('\r\r\n')
+```
+output:
+```
+['Kenneth B.',
+ 'Five Stars',
+ 'June 5, 2016',
+ 'Style: U.S. Version (LGUS991)Verified Purchase',
+ 'Nice phone',
+ 'Helpful',
+ 'Comment Report abuse']
+```
+
+## Preprocessing
+Stemming, Lemmatization wasn't used and stopwords wasn't discarted because it leads to decrease in information and accuracy (~-5%)
+```
 df['Text'] = df['Text'].apply(lambda x: x.split('\r\r\n'))  # Seperate text into parts
 df['Name'] = df['Text'].apply(lambda x: x[0])  # Commentator Names
 df['Title'] = df['Text'].apply(lambda x: x[1]) # Review Titles
 
 # Get the actual customer review by discarding unnecessary parts.
 df['Text'] = df['Text'].apply(sorttext) 
-```
 
-```
-# Titles contain the summary information of customer reviews (e.g. 'Five Stars')
-# Titles should be added into Text column but they shouldn't contain Target info.Otherwise, our algorithm wouldn't perform well.
-df['Title'] = df['Title'].apply(lambda x: "" if ('Star' in x.split())|('Stars' in x.split()) else x)
-```
+# Make everything lowercase for the simplicity.
+df['Text'] = df['Text'].apply(lambda x: x.lower())
+df['Title'] = df['Title'].apply(lambda x: x.lower())
 
-```
-# Gather all of the phone model names from the data
-modellist = list(set(df['Phone Title'].values))
-modellist = list(map(lambda model: ''.join([e for e in model if e not in set(string.punctuation)]),modellist))
-brands = []
-models_1 = []
-models_2 = []
-for model in modellist:
-    if len(model.split())>3:
-        brand = model.split()[0]
-        brands.append(brand)
+# Clean any integer value
+df['Text'] = df['Text'].apply(clean_int2)  
 
-        m = model.split()[1]
-        models_1.append(m)
-
-        m = model.split()[2]
-        models_2.append(m)
-    else:pass
-models_1 = set(map(lambda x: x.lower().strip(),set(models_1)))
-models_2 = set(map(lambda x: x.lower().strip(),set(models_2)))
-
-# Merge the two models set, because they contain some duplicate names.
-models = list(models_1.union(models_2))
-brands = list(map(lambda x: x.lower().strip(),set(brands)))
-```
-
-```
-t0 = time.time()
-print("Preprocessing Comments..","\n")
+# Titles contain the summary information of customer reviews, titles should be added into Text column but some contain Target info.
+df['Title'] = df['Title'].apply(lambda x: "" if ('star' in x.split())|('stars' in x.split()) else x)
 
 # Merge Comments and Titles
 df['Text'] = df['Text']+' '+df['Title']
 df = df[['Text','Stars','Phone Title']]
 
-# Drop NANs
-if df.isna().sum().sum()!=0:
+# Some reviews contain target information i.e. 'gave two stars'
+leakage_list = "gave one two three four five star stars".split()
+df['Text'] = df['Text'].apply(lambda text: ' '.join([word for word in text.split() if word not in leakage_list]))
+
+# Drop NANs if any exist
+if df.isna().any()!=0:
     print("NANs in DF:\n",df.isna().sum())
     df.dropna(axis=0,inplace=True)
+    df.reset_index(inplace=True,drop=True)
 
 # Delete Unnecessary Text
-df['Text'] = df['Text'].apply(lambda x: x.replace('Verified Purchase',""))
-
-# Make the text lowercase for the simplicity.
-df['Text'] = df['Text'].apply(lambda x: x.lower())
+df['Text'] = df['Text'].apply(lambda x: x.replace('verified purchase',""))
+df['Text'] = df['Text'].apply(lambda x: x.replace('amazon',""))
+df['Text'] = df['Text'].apply(lambda x: x.replace('verizon',""))
 
 print(df['Text'][0],"\n")
-print('Deleting model informations...')
+print('Deleting model informations')
 df['Text'] = df['Text'].apply(lambda text: ' '.join([word for word in text.split() if word not in models]))
 
 print('Deleting brand names...')
 df['Text'] = df['Text'].apply(lambda text: ' '.join([word for word in text.split() if word not in brands]))
 
-print("Adjusting characters, skipping symbols, trimming escape characters...\n")
+#print('Deleting stopwords...')
+#df['Text'] = df['Text'].apply(lambda text: ' '.join([word for word in text.split() if word not in set(stopwords.words('english'))]))
+#print(df['Text'][0],"\n")
+
+print("Adjusting characters, trimming escape characters, symbols...\n")
 df['Text'] = df['Text'].apply(clean_str)
 print(df['Text'][0],"\n")
 
-print('Deleting stopwords')
-df['Text'] = df['Text'].apply(lambda text: ' '.join([word for word in text.split() if word not in set(stopwords.words('english'))]))
-
-print('Deleting punctuations')
+print('Deleting punctuations...')
 df['Text'] = df['Text'].apply(lambda ftext: ''.join([e for e in ftext if e not in set(string.punctuation)]))
-
-# Delete Unnecessary Text
-df['Text'] = df['Text'].apply(lambda x: x.replace('amazon',""))
-
-print("Completed within %0.1f minutes." % ((time.time() - t0)/60)) # 13.7
 print(df['Text'][0],"\n")
 ```
 Output:
 ```
-Really really good! It's like a new phone, no one scratches, I'm really happy with it, just the charger is not original but I don't care, it's good enough Nice! 
+really really good! it's like a new phone, no scratches, i'm really happy with it, just the charger is not original but i don't care, it's good enough nice! 
 
-
-Deleting model informations...
+Deleting model informations
 Deleting brand names...
-Adjusting characters, skipping symbols, trimming escape characters...
+Adjusting characters, trimming escape characters, symbols...
 
+really really good it s like a phone scratches i m really happy it just the charger is not original but i don t care it s good enough nice 
 
-really really good it s like a phone scratches i m really happy it just the charger is not but i don t care it s good enough nice 
-
-Deleting stopwords...
 Deleting punctuations...
-Completed within 30.8 minutes.
-
-really really good like phone scratches really happy charger care good enough nice 
+really really good it s like a phone scratches i m really happy it just the charger is not original but i don t care it s good enough nice 
 ```
 
 ## Outliers
@@ -390,13 +405,13 @@ df['textlength'].describe()
 Output:
 ```
 count    199672.000000
-mean        142.354912
-std         316.887600
+mean        220.878125
+std         494.201899
 min           0.000000
-25%          23.000000
-50%          66.000000
-75%         144.000000
-max       16055.000000
+25%          33.000000
+50%         102.000000
+75%         224.000000
+max       25699.000000
 Name: textlength, dtype: float64
 ```
 
@@ -420,31 +435,6 @@ Some of the comments don't reflect the population; some of them are spams, some 
 df['textbool'] = df['textlength'].apply(lambda x: 1 if x<500 else 0)
 df = df[df['textbool']==1]
 ```
-## Brand Review Frequency
-Imbalanced, high tier brand review data might damage the generalization capability of models. However, I was limited with what Amazon presented to me, and choosed not to download ready made data.
-```
-brands = df['Phone Title'].apply(lambda x: x.upper().split()[0]).value_counts()[:8]
-brands
-```
-Output:
-```
-SAMSUNG       81579
-APPLE         56107
-LG            31870
-BLACKBERRY    17989
-VERIZON        3333
-HTC            1365
-XIAOMI         1028
-ONEPLUS         940
-Name: Phone Title, dtype: int64
-```
-
-```
-goBar(brands, 'Brand Review Frequency')
-```
-Output:
-
-![newplot](https://user-images.githubusercontent.com/23128332/61597821-924c1700-ac1d-11e9-8d9f-0af4e09c14f9.png)
 
 ## Target Distribution
 
@@ -610,9 +600,8 @@ Output:
 ### TfidfVectorizer
 ```
 text = df['Text']
-tfidf = TfidfVectorizer(token_pattern=r'\w{2,}',
-                        ngram_range=(1, 3),
-                        max_df=0.5,
+tfidf = TfidfVectorizer(token_pattern=r'\w{1,}',
+                        ngram_range=(1, 4),
                         #encoding='utf-8',
                         #decode_error='ignore',
                         #strip_accents='unicode'
@@ -626,41 +615,46 @@ from sklearn.model_selection import train_test_split
 X = trans_tfidf
 y = df['Satisfaction'].astype(float)
 
-feature_train, feature_test, label_train, label_test = train_test_split(X, y, test_size=0.3, shuffle=True)
+from sklearn.preprocessing import OneHotEncoder
+ohe = OneHotEncoder()
+ohe.fit(y.values.reshape(-1,1))
+hoter = lambda array: ohe.transform(array.values.reshape(-1,1)).toarray()
 ```
 
 # Model Building
 ## Logistic Regression
 ```
-logr = LogisticRegression()
+logr = LogisticRegression(solver='lbfgs',multi_class="multinomial",C=1e5)
 logr, logr_preds = model_eval(logr)
+print('ROC AUC: {:.2f}'.format(roc_auc_score(hoter(y), hoter(pd.Series(logr_preds)))))
 ```
 Output:
 ```
-Fold0, F1_score : 73.80%
-Fold1, F1_score : 69.89%
-Fold2, F1_score : 67.15%
-Fold3, F1_score : 70.31%
-Fold4, F1_score : 68.89%
-[[32844  1790  1477   588  3129]
- [ 6381  1179  1586   614  1600]
- [ 3645   982  2826  2026  3675]
- [ 1690   375  2162  4954 15558]
- [ 2610   318  1173  4945 89678]]
+Fold0, F1_score : 75.52%
+Fold1, F1_score : 71.25%
+Fold2, F1_score : 69.43%
+Fold3, F1_score : 72.14%
+Fold4, F1_score : 70.54%
+[[31282  2054  1551   534  2157]
+ [ 5728  1386  1665   656   999]
+ [ 3075  1150  3081  2363  2596]
+ [ 1209   382  2123  5874 13872]
+ [ 1814   235  1013  5485 87218]]
               precision    recall  f1-score   support
 
-           1       0.70      0.82      0.76     39828
-           2       0.25      0.10      0.15     11360
-           3       0.31      0.21      0.25     13154
-           4       0.38      0.20      0.26     24739
-           5       0.79      0.91      0.84     98724
+           1       0.73      0.83      0.78     37578
+           2       0.27      0.13      0.18     10434
+           3       0.33      0.25      0.28     12265
+           4       0.39      0.25      0.31     23460
+           5       0.82      0.91      0.86     95765
 
-    accuracy                           0.70    187805
-   macro avg       0.48      0.45      0.45    187805
-weighted avg       0.65      0.70      0.67    187805
+    accuracy                           0.72    179502
+   macro avg       0.51      0.48      0.48    179502
+weighted avg       0.68      0.72      0.69    179502
 
-Valid RMSLE: 0.289
-F1_score : 70.01% 
+Valid RMSLE: 0.262
+F1_score : 71.78% 
+ROC AUC: 0.69
 ```
 
 ```
@@ -678,35 +672,37 @@ Output:
 
 ## Stochastic Gradient Descent Classifier
 ```
-model = SGDClassifier(loss='hinge', penalty='l2',alpha=1e-3, max_iter=5, tol=None)
+model = SGDClassifier(loss='hinge', penalty='l2',alpha=1e-5, max_iter=10)
 sgd, sgd_preds = model_eval(model)
+print('ROC AUC: {:.2f}'.format(roc_auc_score(hoter(y), hoter(pd.Series(sgd_preds)))))
 ```
 Output:
 ```
-Fold0, F1_score : 61.67%
-Fold1, F1_score : 60.03%
-Fold2, F1_score : 55.43%
-Fold3, F1_score : 62.26%
-Fold4, F1_score : 61.76%
-[[14683    16     6     5 25118]
- [ 2239    11     8     6  9096]
- [ 1136     7    26    15 11970]
- [  323     6    19     8 24383]
- [  305     5    13    14 98387]]
+Fold0, F1_score : 76.54%
+Fold1, F1_score : 71.39%
+Fold2, F1_score : 68.49%
+Fold3, F1_score : 71.86%
+Fold4, F1_score : 70.89%
+[[37869   151   221   266  3374]
+ [ 8942   238   488   480  2223]
+ [ 5431   221  1160  1888  5494]
+ [ 2069    97   604  3072 20792]
+ [ 1730    32   191  1039 99791]]
               precision    recall  f1-score   support
 
-           1       0.79      0.37      0.50     39828
-           2       0.24      0.00      0.00     11360
-           3       0.36      0.00      0.00     13154
-           4       0.17      0.00      0.00     24739
-           5       0.58      1.00      0.74     98724
+           1       0.68      0.90      0.77     41881
+           2       0.32      0.02      0.04     12371
+           3       0.44      0.08      0.14     14194
+           4       0.46      0.12      0.18     26634
+           5       0.76      0.97      0.85    102783
 
-    accuracy                           0.60    187805
-   macro avg       0.43      0.27      0.25    187805
-weighted avg       0.53      0.60      0.49    187805
+    accuracy                           0.72    197863
+   macro avg       0.53      0.42      0.40    197863
+weighted avg       0.65      0.72      0.64    197863
 
-Valid RMSLE: 0.456
-F1_score : 60.23% 
+Valid RMSLE: 0.279
+F1_score : 71.83% 
+ROC AUC: 0.66
 ```
 
 ```
@@ -722,38 +718,39 @@ Output:
 ![sgdWords](https://user-images.githubusercontent.com/23128332/63229716-1d640100-c20c-11e9-90f4-1fedcf9c9710.JPG)
 
 
-## Support Vector Machine Classifier
+## Linear Support Vector Classifier
 ```
 from sklearn.svm import LinearSVC
 svc = LinearSVC()
 svc, svc_preds = model_eval(svc)
+print('ROC AUC: {:.2f}'.format(roc_auc_score(hoter(y), hoter(pd.Series(svc_preds)))))
 ```
 Output:
 ```
-Fold0, F1_score : 74.92%
-Fold1, F1_score : 70.66%
-Fold2, F1_score : 68.32%
-Fold3, F1_score : 71.24%
-Fold4, F1_score : 70.38%
-[[34423   522   481   501  3901]
- [ 7557   469   545   557  2232]
- [ 4804   396  1147  1796  5011]
- [ 2063   155   679  3419 18423]
- [ 2193    92   284  2074 94081]]
+Fold0, F1_score : 76.40%
+Fold1, F1_score : 71.50%
+Fold2, F1_score : 69.15%
+Fold3, F1_score : 72.27%
+Fold4, F1_score : 71.24%
+[[37287   570   499   433  3092]
+ [ 8396   604   833   653  1885]
+ [ 4850   522  1688  2563  4571]
+ [ 1731   187   980  4986 18750]
+ [ 1610    81   353  2617 98122]]
               precision    recall  f1-score   support
 
-           1       0.67      0.86      0.76     39828
-           2       0.29      0.04      0.07     11360
-           3       0.37      0.09      0.14     13154
-           4       0.41      0.14      0.21     24739
-           5       0.76      0.95      0.85     98724
+           1       0.69      0.89      0.78     41881
+           2       0.31      0.05      0.08     12371
+           3       0.39      0.12      0.18     14194
+           4       0.44      0.19      0.26     26634
+           5       0.78      0.95      0.86    102783
 
-    accuracy                           0.71    187805
-   macro avg       0.50      0.42      0.40    187805
-weighted avg       0.64      0.71      0.65    187805
+    accuracy                           0.72    197863
+   macro avg       0.52      0.44      0.43    197863
+weighted avg       0.66      0.72      0.66    197863
 
-Valid RMSLE: 0.296
-F1_score : 71.11% 
+Valid RMSLE: 0.271
+F1_score : 72.11% 
 ```
 
 # MultinomialNB()
