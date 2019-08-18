@@ -668,14 +668,13 @@ plot_learning_curve(logr,'Logistic Regression', X=X, y=y, n_jobs=4)
 ```
 Output:
 
-![LogR](https://user-images.githubusercontent.com/23128332/63217652-d7973200-c152-11e9-9d4d-18f852b6aac9.JPG)
+![LogR](https://user-images.githubusercontent.com/23128332/63229717-1d640100-c20c-11e9-9f62-1f322d8e4031.JPG)
 ```
 eli5.show_weights(logr, vec=tfidf, top=40)
 ```
 Output:
 
-![logwords](https://user-images.githubusercontent.com/23128332/63217653-d7973200-c152-11e9-835d-1a4b293afafd.JPG)
-
+![logwords](https://user-images.githubusercontent.com/23128332/63229718-1d640100-c20c-11e9-8957-80b329a74117.JPG)
 
 ## Stochastic Gradient Descent Classifier
 ```
@@ -714,13 +713,13 @@ F1_score : 60.23%
 plot_learning_curve(sgd,'Logistic Regression', X=X, y=y, n_jobs=4)
 ```
 Output:
-![SGD](https://user-images.githubusercontent.com/23128332/63217654-d7973200-c152-11e9-89bd-5e78205b6e14.JPG)
+![SGD](https://user-images.githubusercontent.com/23128332/63229719-1d640100-c20c-11e9-8937-5c790e01eb15.JPG)
 
 ```
 eli5.show_weights(sgd, vec=tfidf, top=40)
 ```
 Output:
-![sgdWords](https://user-images.githubusercontent.com/23128332/63217655-d82fc880-c152-11e9-9f46-052fcf54a650.JPG)
+![sgdWords](https://user-images.githubusercontent.com/23128332/63229716-1d640100-c20c-11e9-90f4-1fedcf9c9710.JPG)
 
 
 ## Support Vector Machine Classifier
