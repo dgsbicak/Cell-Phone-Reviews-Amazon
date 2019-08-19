@@ -180,19 +180,12 @@ def model_eval(model, k=5, seed=0):
         model.fit(trainX, trainy)
         p = model.predict(validX)
         oof[valid_ix] = p
-        if len(y.unique())==2:
-            print('Fold{}, Valid AUC: {:.4f}'.format(nfold,roc_auc_score(validy, p)))
-        else:
-            print('Fold{}, F1_score : {:.2%}'.format(nfold,f1_score(validy, p, average='micro')))
-        
+        print('Fold{}, F1_score : {:.2%}'.format(nfold,f1_score(validy, p, average='micro')))
+    
     print(confusion_matrix(y, oof))
     print(classification_report(y, oof))
     print('Valid RMSLE: {:.3f}'.format(np.sqrt(mean_squared_log_error(y, oof))))
     print("F1_score : {:.2%} ".format(f1_score(y, oof, average='micro')))  # 'samples', 'weighted', 'macro', 'micro', 'binary'
-    
-    if len(y.unique())==2:
-        print('AUC: {:.4f}'.format(roc_auc_score(y, oof)))
-
     return model, oof
 ```
 
@@ -626,7 +619,7 @@ hoter = lambda array: ohe.transform(array.values.reshape(-1,1)).toarray()
 ```
 logr = LogisticRegression(solver='lbfgs',multi_class="multinomial",C=1e5)
 logr, logr_preds = model_eval(logr)
-print('ROC AUC: {:.2f}'.format(roc_auc_score(hoter(y), hoter(pd.Series(logr_preds)))))
+
 ```
 Output:
 ```
@@ -654,7 +647,7 @@ weighted avg       0.68      0.72      0.69    179502
 
 Valid RMSLE: 0.262
 F1_score : 71.78% 
-ROC AUC: 0.69
+
 ```
 
 ```
@@ -674,7 +667,6 @@ Output:
 ```
 model = SGDClassifier(loss='hinge', penalty='l2',alpha=1e-5, max_iter=10)
 sgd, sgd_preds = model_eval(model)
-print('ROC AUC: {:.2f}'.format(roc_auc_score(hoter(y), hoter(pd.Series(sgd_preds)))))
 ```
 Output:
 ```
@@ -702,7 +694,6 @@ weighted avg       0.65      0.72      0.64    197863
 
 Valid RMSLE: 0.279
 F1_score : 71.83% 
-ROC AUC: 0.66
 ```
 
 ```
@@ -723,7 +714,6 @@ Output:
 from sklearn.svm import LinearSVC
 svc = LinearSVC()
 svc, svc_preds = model_eval(svc)
-print('ROC AUC: {:.2f}'.format(roc_auc_score(hoter(y), hoter(pd.Series(svc_preds)))))
 ```
 Output:
 ```
@@ -953,7 +943,6 @@ print(confusion_matrix(np.argmax(ytest, axis=1)+1, np.argmax(NN_preds, axis=1)+1
 print(classification_report(np.argmax(ytest, axis=1)+1, np.argmax(NN_preds, axis=1)+1))
 print('Valid RMSLE: {:.3f}'.format(np.sqrt(mean_squared_log_error(ytest.toarray(), NN_preds))))
 print("F1_score : {:.2%} ".format(f1_score(np.argmax(ytest, axis=1)+1, np.argmax(NN_preds, axis=1)+1, average='micro')))
-print('ROC AUC: {:.2f}'.format(roc_auc_score(ytest.toarray(), NN_preds)))
 print("Accuracy: {:.2f}".format(accuracy_score(np.argmax(ytest, axis=1)+1, np.argmax(NN_preds, axis=1)+1)))
 plot_history(history)
 model.save_weights('wo_gru_weights.h5')
@@ -979,7 +968,6 @@ weighted avg       0.51      0.65      0.55     39573
 
 Valid RMSLE: 0.243
 F1_score : 65.47% 
-ROC AUC: 0.78
 Accuracy: 0.65
 ```
 ![NN](https://user-images.githubusercontent.com/23128332/63263842-4dee7e00-c292-11e9-9d31-e2ec5a031b19.png)
@@ -993,13 +981,12 @@ print('Valid RMSLE: {:.2f}'.format(np.sqrt(mean_squared_log_error(y, blend))))
 print('F1_score : {:.2%}'.format(f1_score(y, blend, average='micro')))
 
 hoter = lambda array: ohe.transform(array.values.reshape(-1,1)).toarray()
-print('AUC: {:.2f}'.format(roc_auc_score(hoter(y), hoter(blend))))
+
 ```
 Output:
 ```
 Valid RMSLE: 0.30
 F1_score : 58.95%
-AUC: 0.63
 ```
 
 ### Voting Classifier
@@ -1050,7 +1037,6 @@ print(confusion_matrix(stack_pred, y_test))
 print(classification_report(stack_pred, y_test))
 print('Valid RMSLE: {:.3f}'.format(np.sqrt(mean_squared_log_error(stack_pred, y_test))))
 print("F1_score : {:.2%} ".format(f1_score(y_test, stack_pred, average='micro')))
-print('ROC AUC: {:.2f}'.format(roc_auc_score(onehotter(np.array(y_test)),onehotter(np.array(stack_pred)))))
 ```
 Output:
 ```
@@ -1073,7 +1059,6 @@ weighted avg       0.86      0.72      0.78     37561
 
 Valid RMSLE: 0.290
 F1_score : 71.69% 
-ROC AUC: 0.67
 ```
 
 Output:
