@@ -901,94 +901,88 @@ sess = tf.Session(graph=tf.get_default_graph(),
 session_conf.gpu_options.allow_growth=True
 
 def build_model():
-    embed_dim = 50
+    embed_dim = 10
     nlabels=5
-    nlayer = 1
-    hidden_u = 128
-    attention_u = 64
+    hidden_u = 1
+    conv_u = 4
+    attention_u = 10
 
     model = Sequential()
-    model.add(layers.embeddings.Embedding(xtrain.shape[1], embed_dim))
-    model.add(layers.GRU(units=hidden_u, dropout=0.5, recurrent_dropout=0.2))
-    model.add(layers.Dense(attention_u, activation = 'tanh'))
+    model.add(layers.embeddings.Embedding(xtrain.shape[1], embed_dim, trainable=True))
+    #model.add(layers.GRU(units=hidden_u))#, dropout=0.1, recurrent_dropout=0.1))
+    model.add(layers.GlobalMaxPool1D())
+    model.add(layers.Dense(attention_u, activation = 'relu'))
     """
     model.add(layers.Dropout(0.25))
     model.add(layers.Dense(1, activation = None))
     model.add(layers.Dense(attention_u, activation = 'softmax'))
     """
-    model.add(layers.Dense(nlabels, activation='sigmoid'))
+    model.add(layers.Dense(nlabels, activation='sigmoid')) #'sigmoid'
     model.compile(loss='categorical_crossentropy',
-                 optimizer='adam',
+                 optimizer='adam',# optimizer.SGD(lr=1e-3)
                  metrics=['categorical_accuracy'])
     return model
 
-batch=512
-epoch=5
-k = 5
-kfold = KFold(k, random_state=0)
+xtrain,xtest,ytrain,ytest = train_test_split(X,y,test_size=0.2,random_state=10,shuffle=False)
 
+from keras.preprocessing import text, sequence
 tokenizer = text.Tokenizer()
 tokenizer.fit_on_texts(X)
+del X,y
 
-ohe = OneHotEncoder()
-ohe.fit(y.values.reshape(-1,1))
+xtrain = tokenizer.texts_to_sequences(xtrain)
+xtest  = tokenizer.texts_to_sequences(xtest)
+xtrain = sequence.pad_sequences(xtrain)
+xtest = sequence.pad_sequences(xtest)
+    
+ytrain = ohe.transform(ytrain.values.reshape(-1,1))
+ytest = ohe.transform(ytest.values.reshape(-1,1))
 
-NN_preds = np.zeros((y.shape[0], len(y.unique())))
-for nfold, (train_ix, test_ix) in enumerate(kfold.split(X,y)):
-    print(f"\nFold {nfold+1}/{k}, ... ")
-    xtrain, xtest = X[train_ix], X[test_ix]
-    ytrain, ytest = y[train_ix], y[test_ix]
-    
-    xtrain = tokenizer.texts_to_sequences(xtrain)
-    xtest  = tokenizer.texts_to_sequences(xtest)
-    xtrain = sequence.pad_sequences(xtrain)
-    xtest = sequence.pad_sequences(xtest)
-    
-    ytrain = ohe.transform(ytrain.values.reshape(-1,1))
-    ytest = ohe.transform(ytest.values.reshape(-1,1))
-    
-    model = build_model()
-    history = model.fit(xtrain, ytrain,
-                        validation_split=0.1,
-                       epochs=epoch,
-                       batch_size=batch)
-    score, acc = model.evaluate(xtest, ytest,
-                               batch_size=batch)
-    print(f"{nfold+1}th fold, Score: %.2f, Accuracy: %.2f" % (score,acc))
-    NN_preds[test_ix] = model.predict(xtest)
+batch=10000
+epoch=40
+model = build_model()
+history = model.fit(xtrain, ytrain,
+                    validation_split=0.2,
+                    epochs=epoch,
+                    batch_size=batch)
+score, acc = model.evaluate(xtest, ytest,
+                            batch_size=batch)
 
-ytest = ohe.transform(y.values.reshape(-1,1)).toarray()
-print('Valid RMSLE: {:.3f}'.format(np.sqrt(mean_squared_log_error(ytest, NN_preds))))
-print("F1_score : {:.2%} ".format(f1_score(np.argmax(ytest, axis=1)+1, np.argmax(NN_preds, axis=1)+1, average='micro')))
-print('ROC AUC: {:.2f}'.format(roc_auc_score(ytest, NN_preds)))
-print("Accuracy: {:.2f}".format(accuracy_score(np.argmax(ytest, axis=1)+1, np.argmax(NN_preds, axis=1)+1)))
+NN_preds = model.predict(xtest,batch_size=batch)
 print(confusion_matrix(np.argmax(ytest, axis=1)+1, np.argmax(NN_preds, axis=1)+1))
 print(classification_report(np.argmax(ytest, axis=1)+1, np.argmax(NN_preds, axis=1)+1))
+print('Valid RMSLE: {:.3f}'.format(np.sqrt(mean_squared_log_error(ytest.toarray(), NN_preds))))
+print("F1_score : {:.2%} ".format(f1_score(np.argmax(ytest, axis=1)+1, np.argmax(NN_preds, axis=1)+1, average='micro')))
+print('ROC AUC: {:.2f}'.format(roc_auc_score(ytest.toarray(), NN_preds)))
+print("Accuracy: {:.2f}".format(accuracy_score(np.argmax(ytest, axis=1)+1, np.argmax(NN_preds, axis=1)+1)))
+plot_history(history)
+model.save_weights('wo_gru_weights.h5')
 ```
 Output:
 ```
-[[29159     0    76   353 10240]
- [ 6675     1   100   329  4255]
- [ 5008     2   130   679  7335]
- [ 3162     0   107  1024 20446]
- [ 5956     0    45   723 92000]]
+[[ 6102     0     0     2  1195]
+ [ 1826     0     0     1   705]
+ [ 1532     0     0     6  1421]
+ [ 1044     0     0     4  4606]
+ [ 1320     0     0     5 19804]]
               precision    recall  f1-score   support
 
-           1       0.58      0.73      0.65     39828
-           2       0.33      0.00      0.00     11360
-           3       0.28      0.01      0.02     13154
-           4       0.33      0.04      0.07     24739
-           5       0.69      0.93      0.79     98724
+           1       0.52      0.84      0.64      7299
+           2       0.00      0.00      0.00      2532
+           3       0.00      0.00      0.00      2959
+           4       0.22      0.00      0.00      5654
+           5       0.71      0.94      0.81     21129
 
-    accuracy                           0.65    187805
-   macro avg       0.44      0.34      0.31    187805
-weighted avg       0.57      0.65      0.56    187805
+    accuracy                           0.65     39573
+   macro avg       0.29      0.35      0.29     39573
+weighted avg       0.51      0.65      0.55     39573
 
-Valid RMSLE: 0.238
-F1_score : 65.13% 
+Valid RMSLE: 0.243
+F1_score : 65.47% 
 ROC AUC: 0.78
 Accuracy: 0.65
 ```
+![NN](https://user-images.githubusercontent.com/23128332/63263842-4dee7e00-c292-11e9-9d31-e2ec5a031b19.png)
 
 ## Blending
 ```
