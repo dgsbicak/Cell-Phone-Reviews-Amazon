@@ -7,6 +7,7 @@ I decided to do a NLP project for three main reasons:
 2-I wanted to gather my own data and use my knowledge on a real case.
 3-I will use the models here on other projects.
 ```
+
 I managed to gather almost 200k samples, and after preprocessing I was left with 180k samples in total.
 Both stemming and lemmatizing didn't yield better results due to diminished information in the data, that is why they are not presented in current project.
 Sample size numbers for review stars are shown below:
@@ -17,6 +18,7 @@ Sample size numbers for review stars are shown below:
     3     13296
     2     11450
 ```
+Note: In the previous version, the goal was to predict whether someone liked or disliked a phone (0 or 1). Achieved over 0.91 AUC and 94% F1 score on predicting.
 
 
 ## Importing Libraries
@@ -187,6 +189,7 @@ def model_eval(model, k=5, seed=0):
     print('Valid RMSLE: {:.3f}'.format(np.sqrt(mean_squared_log_error(y, oof))))
     print("F1_score : {:.2%} ".format(f1_score(y, oof, average='micro')))  # 'samples', 'weighted', 'macro', 'micro', 'binary'
     return model, oof
+    
 ```
 
 ## Read the merged data
@@ -589,29 +592,68 @@ Output:
 
 # Algorithm Training
 
+## Problem of Imbalanced Classes
+### Upsampling Minority Classes
+```
+from sklearn.utils import resample
+
+def upsampledf(df,target):
+    """
+    Divides classes into different dataframes,
+    Appends upsampled minority class samples onto majority class samples
+    """
+    majority_class_name = df[target].value_counts().index[0]
+    features = df[target].unique().tolist()
+    majority_df = df[df['Stars']==majority_class_name]
+    threshold = len(majority_df)
+    for feature in features[1:]:
+        print(f"Class '{feature}' is being upsampled. ")
+        one_df = df[df[target]==feature]
+        upsampledclass = resample(one_df,
+                             replace=True, # Sample with replacement
+                              n_samples=threshold,
+                              random_state=10)
+        majority_df = pd.concat([majority_df,upsampledclass],axis=0)
+        majority_df = majority_df.sample(frac=1.0).reset_index(drop=True)
+    print("Final class distribution:")
+    print(majority_df.Stars.value_counts())
+    return majority_df
+
+df = pd.read_csv('cleaned_amazon_yuge.csv')
+df = df.dropna(axis=0).reset_index(drop=True)
+df = upsampledf(df, 'Stars')
+X = df['Text']
+y = df['Stars']
+```
+
+Output:
+```
+Feature '1' is being upsampled. 
+Feature '3' is being upsampled. 
+Feature '4' is being upsampled. 
+Feature '2' is being upsampled. 
+Final class distribution:
+5    102783
+4    102783
+3    102783
+2    102783
+1    102783
+```
+
 ## Vectorization
 ### TfidfVectorizer
 ```
-text = df['Text']
 tfidf = TfidfVectorizer(token_pattern=r'\w{1,}',
-                        ngram_range=(1, 4),
+                        ngram_range=(1, 3),
+                        max_df=0.5,
                         #encoding='utf-8',
                         #decode_error='ignore',
                         #strip_accents='unicode'
                        )
 
-tfidf.fit(text)
-trans_tfidf = tfidf.transform(text)
-#trans_tfidf = tfidf_fitted.transform(feature_test)
-
-from sklearn.model_selection import train_test_split
-X = trans_tfidf
-y = df['Satisfaction'].astype(float)
-
-from sklearn.preprocessing import OneHotEncoder
-ohe = OneHotEncoder()
-ohe.fit(y.values.reshape(-1,1))
-hoter = lambda array: ohe.transform(array.values.reshape(-1,1)).toarray()
+tfidf.fit(X)
+X = tfidf.transform(X)
+y = df['Stars']
 ```
 
 # Model Building
@@ -622,159 +664,148 @@ logr, logr_preds = model_eval(logr)
 
 ```
 Output:
-```
-Fold0, F1_score : 75.52%
-Fold1, F1_score : 71.25%
-Fold2, F1_score : 69.43%
-Fold3, F1_score : 72.14%
-Fold4, F1_score : 70.54%
-[[31282  2054  1551   534  2157]
- [ 5728  1386  1665   656   999]
- [ 3075  1150  3081  2363  2596]
- [ 1209   382  2123  5874 13872]
- [ 1814   235  1013  5485 87218]]
-              precision    recall  f1-score   support
-
-           1       0.73      0.83      0.78     37578
-           2       0.27      0.13      0.18     10434
-           3       0.33      0.25      0.28     12265
-           4       0.39      0.25      0.31     23460
-           5       0.82      0.91      0.86     95765
-
-    accuracy                           0.72    179502
-   macro avg       0.51      0.48      0.48    179502
-weighted avg       0.68      0.72      0.69    179502
-
-Valid RMSLE: 0.262
-F1_score : 71.78% 
-
-```
+---
 
 ```
 plot_learning_curve(logr,'Logistic Regression', X=X, y=y, n_jobs=4)
 ```
 Output:
 
-![LogR](https://user-images.githubusercontent.com/23128332/63229717-1d640100-c20c-11e9-9f62-1f322d8e4031.JPG)
+---
 ```
 eli5.show_weights(logr, vec=tfidf, top=40)
 ```
 Output:
 
-![logwords](https://user-images.githubusercontent.com/23128332/63229718-1d640100-c20c-11e9-8957-80b329a74117.JPG)
+---
 
 ## Stochastic Gradient Descent Classifier
 ```
-model = SGDClassifier(loss='hinge', penalty='l2',alpha=1e-5, max_iter=10)
-sgd, sgd_preds = model_eval(model)
+sgd = SGDClassifier(loss='hinge', penalty='l2',alpha=1e-10)
+sgd, sgd_preds = model_eval(sgd)
+# Save Model 
+pickle.dump(sgd ,open("SGD_model.sav", 'wb'))
 ```
 Output:
 ```
-Fold0, F1_score : 76.54%
-Fold1, F1_score : 71.39%
-Fold2, F1_score : 68.49%
-Fold3, F1_score : 71.86%
-Fold4, F1_score : 70.89%
-[[37869   151   221   266  3374]
- [ 8942   238   488   480  2223]
- [ 5431   221  1160  1888  5494]
- [ 2069    97   604  3072 20792]
- [ 1730    32   191  1039 99791]]
+Fold0, F1_score : 92.23%
+Fold1, F1_score : 92.83%
+Fold2, F1_score : 92.18%
+Fold3, F1_score : 91.71%
+Fold4, F1_score : 92.45%
+[[ 97989   1884   1136    677   1097]
+ [   626 101386    338    249    184]
+ [   251    629  99168   1373   1362]
+ [   234    652   1797  92712   7388]
+ [  1595    798   2756  14651  82983]]
               precision    recall  f1-score   support
 
-           1       0.68      0.90      0.77     41881
-           2       0.32      0.02      0.04     12371
-           3       0.44      0.08      0.14     14194
-           4       0.46      0.12      0.18     26634
-           5       0.76      0.97      0.85    102783
+           1       0.97      0.95      0.96    102783
+           2       0.96      0.99      0.97    102783
+           3       0.94      0.96      0.95    102783
+           4       0.85      0.90      0.87    102783
+           5       0.89      0.81      0.85    102783
 
-    accuracy                           0.72    197863
-   macro avg       0.53      0.42      0.40    197863
-weighted avg       0.65      0.72      0.64    197863
+    accuracy                           0.92    513915
+   macro avg       0.92      0.92      0.92    513915
+weighted avg       0.92      0.92      0.92    513915
 
-Valid RMSLE: 0.279
-F1_score : 71.83% 
+Valid RMSLE: 0.120
+F1_score : 92.28%
 ```
 
 ```
-plot_learning_curve(sgd,'Logistic Regression', X=X, y=y, n_jobs=4)
+plot_learning_curve(sgd,'SGD', X=X, y=y, scoring='neg_mean_squared_log_error', n_jobs=4)
 ```
 Output:
-![SGD](https://user-images.githubusercontent.com/23128332/63229719-1d640100-c20c-11e9-8937-5c790e01eb15.JPG)
+![SGD](https://user-images.githubusercontent.com/23128332/63510611-ab2f3d00-c4e7-11e9-9043-2c24ab7f4372.JPG)
+
+```
+plot_learning_curve(sgd,'SGD', X=X, y=y, scoring='accuracy', n_jobs=4)
+```
+Output:
+![SGDacc](https://user-images.githubusercontent.com/23128332/63510612-abc7d380-c4e7-11e9-8f4b-318e697d1f9f.JPG)
 
 ```
 eli5.show_weights(sgd, vec=tfidf, top=40)
 ```
 Output:
-![sgdWords](https://user-images.githubusercontent.com/23128332/63229716-1d640100-c20c-11e9-90f4-1fedcf9c9710.JPG)
-
+[sgdWords](https://user-images.githubusercontent.com/23128332/63510609-ab2f3d00-c4e7-11e9-8581-563d87548455.JPG)
 
 ## Linear Support Vector Classifier
 ```
 from sklearn.svm import LinearSVC
 svc = LinearSVC()
 svc, svc_preds = model_eval(svc)
+pickle.dump(svc ,open("linearSVC109.sav", 'wb'))  # Save the model
 ```
 Output:
 ```
-Fold0, F1_score : 76.40%
-Fold1, F1_score : 71.50%
-Fold2, F1_score : 69.15%
-Fold3, F1_score : 72.27%
-Fold4, F1_score : 71.24%
-[[37287   570   499   433  3092]
- [ 8396   604   833   653  1885]
- [ 4850   522  1688  2563  4571]
- [ 1731   187   980  4986 18750]
- [ 1610    81   353  2617 98122]]
+Fold0, F1_score : 93.70%
+Fold1, F1_score : 93.66%
+Fold2, F1_score : 93.52%
+Fold3, F1_score : 93.54%
+Fold4, F1_score : 93.58%
+[[ 99378   1458    764    364    819]
+ [   820 101308    338    225     92]
+ [   348    286  99452   1803    894]
+ [   314    183   1451  93074   7761]
+ [  1703    386   1714  11170  87810]]
               precision    recall  f1-score   support
 
-           1       0.69      0.89      0.78     41881
-           2       0.31      0.05      0.08     12371
-           3       0.39      0.12      0.18     14194
-           4       0.44      0.19      0.26     26634
-           5       0.78      0.95      0.86    102783
+           1       0.97      0.97      0.97    102783
+           2       0.98      0.99      0.98    102783
+           3       0.96      0.97      0.96    102783
+           4       0.87      0.91      0.89    102783
+           5       0.90      0.85      0.88    102783
 
-    accuracy                           0.72    197863
-   macro avg       0.52      0.44      0.43    197863
-weighted avg       0.66      0.72      0.66    197863
+    accuracy                           0.94    513915
+   macro avg       0.94      0.94      0.94    513915
+weighted avg       0.94      0.94      0.94    513915
 
-Valid RMSLE: 0.271
-F1_score : 72.11% 
+Valid RMSLE: 0.109
+F1_score : 93.60% 
 ```
+
+```
+eli5.show_weights(svc, vec=tfidf, top=40)
+```
+Output:
+![SVCwords](https://user-images.githubusercontent.com/23128332/63510979-a919ae00-c4e8-11e9-9b56-b932c82929d7.JPG)
 
 # MultinomialNB()
 ```
 from sklearn.naive_bayes import MultinomialNB
 MNB = MultinomialNB()
 MNB, MNB_preds = model_eval(MNB)
+pickle.dump(MNB ,open("MultinomialNB.sav", 'wb'))
 ```
 Output:
 ```
-Fold0, F1_score : 64.68%
-Fold1, F1_score : 62.46%
-Fold2, F1_score : 59.67%
-Fold3, F1_score : 64.65%
-Fold4, F1_score : 63.92%
-[[19969     0     0     0 19859]
- [ 3022     0     0     0  8338]
- [ 1262     0     0     0 11892]
- [  278     0     0     1 24460]
- [  234     0     0     0 98490]]
+Fold0, F1_score : 83.20%
+Fold1, F1_score : 83.33%
+Fold2, F1_score : 82.88%
+Fold3, F1_score : 83.10%
+Fold4, F1_score : 83.29%
+[[87558 10732  3420   775   298]
+ [ 2554 98448  1093   488   200]
+ [ 1955  1601 94962  2787  1478]
+ [ 1245  2778  4467 84349  9944]
+ [ 1897  3287  5178 30383 62038]]
               precision    recall  f1-score   support
 
-           1       0.81      0.50      0.62     39828
-           2       0.00      0.00      0.00     11360
-           3       0.00      0.00      0.00     13154
-           4       1.00      0.00      0.00     24739
-           5       0.60      1.00      0.75     98724
+           1       0.92      0.85      0.88    102783
+           2       0.84      0.96      0.90    102783
+           3       0.87      0.92      0.90    102783
+           4       0.71      0.82      0.76    102783
+           5       0.84      0.60      0.70    102783
 
-    accuracy                           0.63    187805
-   macro avg       0.48      0.30      0.27    187805
-weighted avg       0.62      0.63      0.53    187805
+    accuracy                           0.83    513915
+   macro avg       0.84      0.83      0.83    513915
+weighted avg       0.84      0.83      0.83    513915
 
-Valid RMSLE: 0.415
-F1_score : 63.08% 
+Valid RMSLE: 0.169
+F1_score : 83.16% 
 ```
 
 
@@ -782,30 +813,31 @@ F1_score : 63.08%
 ```
 tree = RandomForestClassifier(verbose=1, n_jobs=-1)
 tree , tree_preds = model_eval(tree,k=2)
+pickle.dump(svc ,open("bigoltree.sav", 'wb'))
 ```
 Output:
 ```
-Fold0, F1_score : 66.86%
-Fold1, F1_score : 66.16%
-[[30886   588   587   433  7334]
- [ 6966   282   382   271  3459]
- [ 5177   268   575   651  6483]
- [ 3298   155   451  1137 19698]
- [ 4503   184   366  1636 92035]]
+Fold0, F1_score : 89.21%
+Fold1, F1_score : 89.19%
+[[ 96271   1657   1225   1244   2386]
+ [  1568 100168    405    364    278]
+ [  1344    388  97485   2177   1389]
+ [  2492    455   2165  86530  11141]
+ [  7745    835   2390  13860  77953]]
               precision    recall  f1-score   support
 
-           1       0.61      0.78      0.68     39828
-           2       0.19      0.02      0.04     11360
-           3       0.24      0.04      0.07     13154
-           4       0.28      0.05      0.08     24739
-           5       0.71      0.93      0.81     98724
+           1       0.88      0.94      0.91    102783
+           2       0.97      0.97      0.97    102783
+           3       0.94      0.95      0.94    102783
+           4       0.83      0.84      0.84    102783
+           5       0.84      0.76      0.80    102783
 
-    accuracy                           0.67    187805
-   macro avg       0.41      0.36      0.34    187805
-weighted avg       0.57      0.67      0.59    187805
+    accuracy                           0.89    513915
+   macro avg       0.89      0.89      0.89    513915
+weighted avg       0.89      0.89      0.89    513915
 
-Valid RMSLE: 0.367
-F1_score : 66.51% 
+Valid RMSLE: 0.195
+F1_score : 89.20% 
 ```
 
 ```
@@ -829,7 +861,8 @@ fig = go.Figure(data=[trace], layout=layout)
 py.iplot(fig)
 ```
 Output:
-![Forest](https://user-images.githubusercontent.com/23128332/63217651-d7973200-c152-11e9-8bcf-2d8cebd924fe.JPG)
+![image](https://user-images.githubusercontent.com/23128332/63511166-1f1e1500-c4e9-11e9-9cd0-d67d9d561637.png)
+
 
 ## Lightgbm
 ```
@@ -841,37 +874,13 @@ lgb_model, lgb_preds = model_eval(model)
 ```
 Output:
 ```
-Fold0, F1_score : 73.40%
-Fold1, F1_score : 69.64%
-Fold2, F1_score : 66.97%
-Fold3, F1_score : 69.97%
-Fold4, F1_score : 69.09%
-[[32049   354   518   673  6234]
- [ 6715   384   633   680  2948]
- [ 4184   284  1361  1790  5535]
- [ 1999   133   673  3569 18365]
- [ 2709    79   278  1908 93750]]
-              precision    recall  f1-score   support
-
-           1       0.67      0.80      0.73     39828
-           2       0.31      0.03      0.06     11360
-           3       0.39      0.10      0.16     13154
-           4       0.41      0.14      0.21     24739
-           5       0.74      0.95      0.83     98724
-
-    accuracy                           0.70    187805
-   macro avg       0.51      0.41      0.40    187805
-weighted avg       0.63      0.70      0.64    187805
-
-Valid RMSLE: 0.326
-F1_score : 69.81% 
 ```
+
 ```
-eli5.show_weights(lgb_model, vec=tfidf, top=50)
+eli5.show_weights(lgb_model, vec=tfidf, top=40)
 ```
 Output:
 
-![lgweights](https://user-images.githubusercontent.com/23128332/58370208-7d4c5380-7f0c-11e9-8193-3d90984094d3.JPG)
 
 # Neural Networks
 ```
@@ -949,28 +958,9 @@ model.save_weights('wo_gru_weights.h5')
 ```
 Output:
 ```
-[[ 6102     0     0     2  1195]
- [ 1826     0     0     1   705]
- [ 1532     0     0     6  1421]
- [ 1044     0     0     4  4606]
- [ 1320     0     0     5 19804]]
-              precision    recall  f1-score   support
 
-           1       0.52      0.84      0.64      7299
-           2       0.00      0.00      0.00      2532
-           3       0.00      0.00      0.00      2959
-           4       0.22      0.00      0.00      5654
-           5       0.71      0.94      0.81     21129
-
-    accuracy                           0.65     39573
-   macro avg       0.29      0.35      0.29     39573
-weighted avg       0.51      0.65      0.55     39573
-
-Valid RMSLE: 0.243
-F1_score : 65.47% 
-Accuracy: 0.65
 ```
-![NN](https://user-images.githubusercontent.com/23128332/63263842-4dee7e00-c292-11e9-9d31-e2ec5a031b19.png)
+
 
 ## Blending
 ```
@@ -985,8 +975,7 @@ hoter = lambda array: ohe.transform(array.values.reshape(-1,1)).toarray()
 ```
 Output:
 ```
-Valid RMSLE: 0.30
-F1_score : 58.95%
+
 ```
 
 ### Voting Classifier
@@ -1040,29 +1029,10 @@ print("F1_score : {:.2%} ".format(f1_score(y_test, stack_pred, average='micro'))
 ```
 Output:
 ```
-[[ 7027  1550   964   431   475]
- [   24    44    15     6     1]
- [  188   233   434   244    87]
- [   87   103   376   803   491]
- [  669   359   858  3472 18620]]
-              precision    recall  f1-score   support
 
-           1       0.88      0.67      0.76     10447
-           2       0.02      0.49      0.04        90
-           3       0.16      0.37      0.23      1186
-           4       0.16      0.43      0.24      1860
-           5       0.95      0.78      0.85     23978
-
-    accuracy                           0.72     37561
-   macro avg       0.43      0.55      0.42     37561
-weighted avg       0.86      0.72      0.78     37561
-
-Valid RMSLE: 0.290
-F1_score : 71.69% 
 ```
 
 Output:
-![stacked](https://user-images.githubusercontent.com/23128332/63217656-d82fc880-c152-11e9-8081-50a643e768cb.JPG)
 
 
 ## Things to do:
