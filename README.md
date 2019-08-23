@@ -31,21 +31,25 @@ import pickle
 import time
 import string
 import os
-os.chdir(r"C:\Users\dogus\Dropbox\DgsPy_DBOX\Amazon Project")
+os.chdir(r"C:\Users\dogus\OneDrive\Masaüstü\DgsPy\DgsPy_DBOX\Amazon Project")
 
 import plotly.offline as py
 py.init_notebook_mode(connected=True)
 import plotly.graph_objs as go
 import matplotlib.pyplot as plt
+plt.style.use('ggplot')
 %matplotlib inline
 
 from nltk.corpus import stopwords
 from contextlib import contextmanager
 import eli5
 
-import warnings
-warnings.filterwarnings("ignore")
+from collections import Counter
 
+from imblearn.under_sampling import NearMiss, RandomUnderSampler
+from imblearn.over_sampling import SMOTE, ADASYN, RandomOverSampler
+
+from sklearn.preprocessing import OneHotEncoder
 from sklearn.model_selection import ShuffleSplit, learning_curve
 from sklearn.model_selection import train_test_split
 from sklearn.model_selection import StratifiedKFold
@@ -53,13 +57,59 @@ from sklearn.model_selection import StratifiedKFold
 from sklearn.linear_model import SGDClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import confusion_matrix, classification_report
-from sklearn.metrics import f1_score, log_loss,roc_auc_score
+from sklearn.metrics import f1_score, log_loss,precision_score, recall_score
 from sklearn.metrics import accuracy_score
-from sklearn.metrics import mean_squared_log_error
+from sklearn.metrics import roc_curve
+from sklearn.metrics import roc_auc_score
+from sklearn.utils import class_weight
 
 from sklearn.feature_extraction.text import TfidfTransformer, TfidfVectorizer, CountVectorizer
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import VotingClassifier
+
+import lightgbm as lgb
+from lightgbm import LGBMClassifier
+from xgboost import XGBClassifier
+
+import gc
+
+import tensorflow as tf
+from tensorflow.keras import backend as K
+num_cores = 4
+
+CPU=False
+GPU=True
+if GPU:
+    num_GPU = 1
+    num_CPU = 1
+if CPU:
+    print("Keras will run on CPU")
+    num_CPU = 1
+    num_GPU = 0
+
+config = tf.ConfigProto(intra_op_parallelism_threads=num_cores,
+                        inter_op_parallelism_threads=num_cores, 
+                        allow_soft_placement=True,
+                        device_count = {'CPU' : num_CPU,
+                                        'GPU' : num_GPU}
+                       )
+
+session = tf.Session(config=config)
+K.set_session(session)
+
+from tensorflow.keras.preprocessing import text, sequence
+from tensorflow.keras import optimizers
+from tensorflow.keras import layers
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.optimizers import Adam
+
+from IPython.display import SVG
+from keras.utils.vis_utils import model_to_dot
+
+import warnings
+warnings.filterwarnings("ignore")
 ```
+
 
 ## Functions Used
 ```
@@ -97,7 +147,6 @@ def clean_str(text):
     return text
 
 def clean_int2(text):
-    import re
     output = re.sub(r'\d+', '', str(text))
     return output
 
@@ -118,38 +167,6 @@ def sorttext(x):
         else:
             x = " ".join(x[4:-2])
     return x
-
-def plot_learning_curve(estimator, title, X, y, ylim=None, cv=None,
-                        n_jobs=1, train_sizes=np.linspace(.1, 1.0, 5)):
-    plt.figure()
-    plt.subplots(figsize=(12,6))
-    plt.title(title)
-    if ylim is not None:
-        plt.ylim(*ylim)
-    plt.xlabel("Training examples")
-    plt.ylabel("Score")
-    
-    train_sizes, train_scores, test_scores = learning_curve(
-        estimator, X, y, cv=cv, n_jobs=n_jobs, train_sizes=train_sizes)
-    train_scores_mean = np.mean(train_scores, axis=1)
-    train_scores_std = np.std(train_scores, axis=1)
-    test_scores_mean = np.mean(test_scores, axis=1)
-    test_scores_std = np.std(test_scores, axis=1)
-    plt.grid()
-
-    plt.fill_between(train_sizes, train_scores_mean - train_scores_std,
-                     train_scores_mean + train_scores_std, alpha=0.1,
-                     color="r")
-    plt.fill_between(train_sizes, test_scores_mean - test_scores_std,
-                     test_scores_mean + test_scores_std, alpha=0.1, color="g")
-    plt.plot(train_sizes, train_scores_mean, 'o-', color="r",
-             label="Training score")
-    plt.plot(train_sizes, test_scores_mean, 'o-', color="g",
-             label="Cross-validation score")
-
-    plt.legend(loc="best")
-    plt.savefig('learningcurves.png')
-    return plt
 
 def goBar(variables,name,text=None):
     trace= go.Bar(
@@ -172,8 +189,42 @@ def goBar(variables,name,text=None):
                    )
     py.iplot(fig)
 
+def plot_learning_curve(estimator, title, X, y, scoring=None, ylim=None, cv=None,
+                        n_jobs=1, train_sizes=np.linspace(.1, 1.0, 5)):
+    plt.figure()
+    plt.subplots(figsize=(12,6))
+    plt.title(title)
+    if ylim is not None:
+        plt.ylim(*ylim)
+    plt.xlabel("Training examples")
+    plt.ylabel("Score")
+    
+    train_sizes, train_scores, test_scores = learning_curve(estimator, X, y,
+                                                            cv=cv, n_jobs=n_jobs,
+                                                            scoring=scoring,
+                                                            train_sizes=train_sizes)
+    train_scores_mean = np.mean(train_scores, axis=1)
+    train_scores_std = np.std(train_scores, axis=1)
+    test_scores_mean = np.mean(test_scores, axis=1)
+    test_scores_std = np.std(test_scores, axis=1)
+    plt.grid()
+
+    plt.fill_between(train_sizes, train_scores_mean - train_scores_std,
+                     train_scores_mean + train_scores_std, alpha=0.1,
+                     color="r")
+    plt.fill_between(train_sizes, test_scores_mean - test_scores_std,
+                     test_scores_mean + test_scores_std, alpha=0.1, color="g")
+    plt.plot(train_sizes, train_scores_mean, 'o-', color="r",
+             label="Training score")
+    plt.plot(train_sizes, test_scores_mean, 'o-', color="g",
+             label="Cross-validation score")
+
+    plt.legend(loc="best")
+    plt.savefig('learningcurves.png')
+    return plt
+    
 def model_eval(model, k=5, seed=0):
-    kfold = KFold(k, random_state=seed)
+    kfold = StratifiedKFold(k, shuffle=True,random_state=seed)
     oof = np.zeros(y.shape[0])
     for nfold, (train_ix, valid_ix) in enumerate(kfold.split(X,y)):
         trainX, validX = X[train_ix], X[valid_ix]
@@ -182,14 +233,44 @@ def model_eval(model, k=5, seed=0):
         model.fit(trainX, trainy)
         p = model.predict(validX)
         oof[valid_ix] = p
-        print('Fold{}, F1_score : {:.2%}'.format(nfold,f1_score(validy, p, average='micro')))
+        print('Fold{}, F1_micro : {:.2%}'.format(nfold+1,f1_score(validy, p, average='micro')))
     
     print(confusion_matrix(y, oof))
-    print(classification_report(y, oof))
-    print('Valid RMSLE: {:.3f}'.format(np.sqrt(mean_squared_log_error(y, oof))))
-    print("F1_score : {:.2%} ".format(f1_score(y, oof, average='micro')))  # 'samples', 'weighted', 'macro', 'micro', 'binary'
+    print(classification_report(y, oof, target_names=["1 Star", "2 Stars", "3 Stars", "4 Stars", "5 Stars"]))
+    print("F1_micro : {:.2%} ".format(f1_score(test_y, p, average='micro')))
     return model, oof
-    
+
+def simple_eval(model,xtrain,ytrain):
+    model.fit(xtrain, ytrain)
+    p = model.predict(test_X)
+
+    print(classification_report(test_y, p, target_names=["1 Star", "2 Stars", "3 Stars", "4 Stars", "5 Stars"]))
+    print("F1_micro/Acc : {:.2%} ".format(f1_score(test_y, p, average='micro')))
+    return model, p
+
+def plot_history(history):
+    acc = history.history['acc']
+    val_acc = history.history['val_acc']
+    loss = history.history['loss']
+    val_loss = history.history['val_loss']
+    x = range(1, len(acc) + 1)
+
+    plt.figure(figsize=(18, 8))
+    plt.subplot(1, 2, 1)
+    plt.plot(x, acc, 'b', label='Training acc')
+    plt.plot(x, val_acc, 'r', label='Validation acc')
+    plt.title('Training and validation accuracy')
+    plt.legend()
+    plt.subplot(1, 2, 2)
+    plt.plot(x, loss, 'b', label='Training loss')
+    plt.plot(x, val_loss, 'r', label='Validation loss')
+    plt.title('Training and validation loss')
+    plt.legend()
+
+def pickle_model(model, filename):
+    try: os.mkdir("models")
+    except:pass
+    pickle.dump(model, open("models/"+filename, 'wb'))
 ```
 
 ## Read the merged data
@@ -590,54 +671,16 @@ Output:
 
 ![newplot (3)](https://user-images.githubusercontent.com/23128332/58369286-ea59ec00-7f00-11e9-8a84-60b4ccedca22.png)
 
-# Algorithm Training
+# Part 2: Algorithm Training
 
-## Problem of Imbalanced Classes
-### Upsampling Minority Classes
 ```
-from sklearn.utils import resample
-
-def upsampledf(df,target):
-    """
-    Divides classes into different dataframes,
-    Appends upsampled minority class samples onto majority class samples
-    """
-    majority_class_name = df[target].value_counts().index[0]
-    features = df[target].unique().tolist()
-    majority_df = df[df['Stars']==majority_class_name]
-    threshold = len(majority_df)
-    for feature in features[1:]:
-        print(f"Class '{feature}' is being upsampled. ")
-        one_df = df[df[target]==feature]
-        upsampledclass = resample(one_df,
-                             replace=True, # Sample with replacement
-                              n_samples=threshold,
-                              random_state=10)
-        majority_df = pd.concat([majority_df,upsampledclass],axis=0)
-        majority_df = majority_df.sample(frac=1.0).reset_index(drop=True)
-    print("Final class distribution:")
-    print(majority_df.Stars.value_counts())
-    return majority_df
-
+# Load the Data
 df = pd.read_csv('cleaned_amazon_yuge.csv')
-df = df.dropna(axis=0).reset_index(drop=True)
-df = upsampledf(df, 'Stars')
+df = df.dropna(axis=0).sample(frac=1.0).reset_index(drop=True)
+TEST = df[int(len(df)*0.80):]  # 20%
+df = df[:int(len(df)*0.80)]  # 80%
 X = df['Text']
 y = df['Stars']
-```
-
-Output:
-```
-Feature '1' is being upsampled. 
-Feature '3' is being upsampled. 
-Feature '4' is being upsampled. 
-Feature '2' is being upsampled. 
-Final class distribution:
-5    102783
-4    102783
-3    102783
-2    102783
-1    102783
 ```
 
 ## Vectorization
@@ -646,166 +689,321 @@ Final class distribution:
 tfidf = TfidfVectorizer(token_pattern=r'\w{1,}',
                         ngram_range=(1, 3),
                         max_df=0.5,
-                        #encoding='utf-8',
-                        #decode_error='ignore',
-                        #strip_accents='unicode'
-                       )
+                        max_features=100000)
 
 tfidf.fit(X)
 X = tfidf.transform(X)
 y = df['Stars']
+
+test_X = tfidf.transform(TEST['Text'])
+test_y = TEST['Stars']
 ```
 
-# Model Building
-## Logistic Regression
-```
-logr = LogisticRegression(solver='lbfgs',multi_class="multinomial",C=1e5)
-logr, logr_preds = model_eval(logr)
+## Model Building
 
+### Over-Sampling Using SMOTE, ADASYN,RandomOverSampler
+```
+# Standard Data Class Distribution
+print("Class Distribution for Standard Data:\n",Counter(y))
+
+# Apply SMOTE on Tfidf vector
+smote = SMOTE(sampling_strategy='auto', random_state=10,n_jobs=-1)
+X_smote, y_smote = smote.fit_sample(X,y)
+print("Class Distribution for SMOTE:\n",Counter(y_smote))
+
+ada = ADASYN(sampling_strategy='not majority', random_state=10,n_jobs=-1)
+X_ada, y_ada = ada.fit_sample(X,y)
+print("Class Distribution for ADASYN:\n",Counter(y_ada))
+
+rsamp = RandomOverSampler(random_state=10)
+X_ra, y_ra = rsamp.fit_sample(X,y)
+print("Class Distribution for RandomOverSampler:\n",Counter(y_ra))
 ```
 Output:
----
+```
+Class Distribution for Standard Data:
+ Counter({5: 82023, 1: 33491, 4: 21468, 3: 11387, 2: 9921})
+Class Distribution for SMOTE:
+ Counter({5: 82023, 1: 82023, 3: 82023, 4: 82023, 2: 82023})
+Class Distribution for ADASYN:
+ Counter({2: 84952, 4: 82561, 3: 82370, 5: 82023, 1: 78497})
+Class Distribution for RandomOverSampler:
+ Counter({5: 82023, 1: 82023, 3: 82023, 4: 82023, 2: 82023})
+```
 
+### Over-Sampled Data Training with Logistic Regression
+Logistic regression gives good performance. After testing various over & under sampling techniques, the method that gives the best results will be chosen.
+
+#### Training on the original data
+```
+logr = LogisticRegression(solver='sag',multi_class="multinomial",n_jobs=-1)
+logr, logr_preds = simple_eval(logr,X,y)
+```
+Output:
+```
+              precision    recall  f1-score   support
+
+      1 Star       0.71      0.88      0.79      8361
+     2 Stars       0.32      0.08      0.12      2489
+     3 Stars       0.38      0.19      0.26      2810
+     4 Stars       0.45      0.22      0.30      5335
+     5 Stars       0.80      0.95      0.86     20578
+
+    accuracy                           0.73     39573
+   macro avg       0.53      0.46      0.47     39573
+weighted avg       0.67      0.73      0.68     39573
+
+F1_micro/Acc : 72.72% 
+```
+
+#### Training on the original data with Class Weights
+```
+class_weights = class_weight.compute_class_weight('balanced',np.unique(y),y)
+class_weights = {clss+1: weight for clss, weight in enumerate(class_weights)}
+print(class_weights)
+
+# Training on the standard data with class weights.
+logr = LogisticRegression(solver='sag',multi_class="multinomial",class_weight=class_weights,n_jobs=-1)
+simple_eval(logr,X,y)
+```
+Output:
+```
+{1: 0.9452688782060852, 2: 3.191008970869872, 3: 2.780187933608501, 4: 1.4746599590087572, 5: 0.38596491228070173}
+              precision    recall  f1-score   support
+
+      1 Star       0.76      0.72      0.74      8390
+     2 Stars       0.23      0.32      0.27      2450
+     3 Stars       0.28      0.38      0.32      2807
+     4 Stars       0.34      0.45      0.39      5166
+     5 Stars       0.90      0.75      0.82     20760
+
+    accuracy                           0.65     39573
+   macro avg       0.50      0.53      0.51     39573
+weighted avg       0.71      0.65      0.68     39573
+
+F1_micro/Acc : 65.26% 
+```
+
+#### Synthetic Minority Over-sampling (SMOTE) Method Result
+```
+# Apply SMOTE on Tfidf vector
+logr = LogisticRegression(solver='sag',multi_class="multinomial",n_jobs=-1)
+simple_eval(logr,X_smote, y_smote)
+```
+Output:
+```
+              precision    recall  f1-score   support
+
+      1 Star       0.76      0.75      0.75      8390
+     2 Stars       0.23      0.29      0.25      2450
+     3 Stars       0.26      0.37      0.31      2807
+     4 Stars       0.34      0.40      0.37      5166
+     5 Stars       0.88      0.76      0.81     20760
+
+    accuracy                           0.66     39573
+   macro avg       0.49      0.52      0.50     39573
+weighted avg       0.70      0.66      0.67     39573
+
+F1_micro/Acc : 65.50% 
+```
+
+#### Adaptive Synthetic (ADASYN) Method Result
+```
+logr = LogisticRegression(solver='sag',multi_class="multinomial",n_jobs=-1)
+simple_eval(logr,X_ada, y_ada)
+```
+Output:
+```
+F1_micro/Acc : 65.04% 
+```
+
+#### Random Over-Sampler Method Result
+```
+logr = LogisticRegression(solver='sag',multi_class="multinomial",n_jobs=-1)
+simple_eval(logr,X_ra, y_ra)
+```
+Output:
+```
+F1_micro/Acc : 63.66% 
+```
+
+### Under-sampling Using NearMiss, RandomUnderSampler
+
+```
+from imblearn.under_sampling import NearMiss, RandomUnderSampler
+print("First NM")
+nm = NearMiss(version=1,n_neighbors=5,random_state=10,n_jobs=-1)
+X_nm1, y_nm1 = nm.fit_sample(X,y)
+print("Class Distribution for NearMiss Version 1:\n",Counter(y_nm1))
+
+print("Second NM")
+nm = NearMiss(version=2,random_state=10,n_jobs=-1)
+X_nm2, y_nm2 = nm.fit_sample(X,y)
+print("Class Distribution for NearMiss Version 2:\n",Counter(y_nm2))
+
+print("Third NM")
+nm = NearMiss(version=3,random_state=10,n_jobs=-1)
+X_nm3, y_nm3 = nm.fit_sample(X,y)
+print("Class Distribution for NearMiss Version 3:\n",Counter(y_nm3))
+
+rus = RandomUnderSampler(random_state=10)
+X_rus, y_rus = rus.fit_sample(X,y)
+print("Class Distribution for NearMiss Version 4:\n",Counter(y_rus))
+```
+Output:
+```
+First NM
+Class Distribution for NearMiss Version 1:
+ Counter({1: 9921, 2: 9921, 3: 9921, 4: 9921, 5: 9921})
+Second NM
+Class Distribution for NearMiss Version 2:
+ Counter({1: 9921, 2: 9921, 3: 9921, 4: 9921, 5: 9921})
+Third NM
+Class Distribution for NearMiss Version 3:
+ Counter({2: 9921, 1: 1714, 5: 925, 3: 683, 4: 618})
+Class Distribution for RandomUnderSampler:
+ Counter({1: 9921, 2: 9921, 3: 9921, 4: 9921, 5: 9921})
+ ```
+
+#### Results
+
+Nearmiss version-2 and RandomUnderSampler yields best results among other under sampling methods, but fails to pass the success of the first model that trained on the original data, mainly due to the discarded 1&5 Starred reviews, which makes up the most of the data.
+
+```
+logr = LogisticRegression(solver='sag',multi_class="multinomial",class_weight=class_weights,n_jobs=-1)
+simple_eval(logr,X_nm2, y_nm2)
+```
+NearMiss Version-2
+Output:
+```
+                precision    recall  f1-score   support
+      1 Star       0.87      0.31      0.46      8390
+     2 Stars       0.15      0.61      0.24      2450
+     3 Stars       0.19      0.46      0.27      2807
+     4 Stars       0.20      0.50      0.29      5166
+     5 Stars       0.95      0.30      0.45     20760
+
+    accuracy                           0.36     39573
+   macro avg       0.47      0.44      0.34     39573
+weighted avg       0.73      0.36      0.40     39573
+
+F1_micro/Acc : 35.75% 
+```
+
+NearMiss Version-1
+```
+F1_micro/Acc : 23.17% 
+```
+NearMiss Version-3
+```
+F1_micro/Acc : 6.66%
+```
+RandomUnderSampler
+```
+F1_micro/Acc : 33.51% 
+```
+
+### Moving on with the original data
+### LogisticRegression
 ```
 plot_learning_curve(logr,'Logistic Regression', X=X, y=y, n_jobs=4)
 ```
 Output:
+![LogR](https://user-images.githubusercontent.com/23128332/63623210-b1194100-c601-11e9-85e1-fc7f834a0fc2.JPG)
 
----
 ```
 eli5.show_weights(logr, vec=tfidf, top=40)
 ```
 Output:
+![logwords](https://user-images.githubusercontent.com/23128332/63623212-b1194100-c601-11e9-961c-500926cf4b2f.JPG)
 
----
 
 ## Stochastic Gradient Descent Classifier
 ```
-sgd = SGDClassifier(loss='hinge', penalty='l2',alpha=1e-10)
-sgd, sgd_preds = model_eval(sgd)
-# Save Model 
-pickle.dump(sgd ,open("SGD_model.sav", 'wb'))
+sgd = SGDClassifier(loss='hinge', penalty='l2',alpha=1e-5, n_jobs=-1)
+#sgd, sgd_preds = model_eval(sgd)
+sgd, sgd_preds = simple_eval(sgd,X,y)
 ```
 Output:
 ```
-Fold0, F1_score : 92.23%
-Fold1, F1_score : 92.83%
-Fold2, F1_score : 92.18%
-Fold3, F1_score : 91.71%
-Fold4, F1_score : 92.45%
-[[ 97989   1884   1136    677   1097]
- [   626 101386    338    249    184]
- [   251    629  99168   1373   1362]
- [   234    652   1797  92712   7388]
- [  1595    798   2756  14651  82983]]
               precision    recall  f1-score   support
 
-           1       0.97      0.95      0.96    102783
-           2       0.96      0.99      0.97    102783
-           3       0.94      0.96      0.95    102783
-           4       0.85      0.90      0.87    102783
-           5       0.89      0.81      0.85    102783
+      1 Star       0.69      0.90      0.78      8390
+     2 Stars       0.25      0.05      0.08      2450
+     3 Stars       0.40      0.12      0.19      2807
+     4 Stars       0.44      0.14      0.22      5166
+     5 Stars       0.78      0.96      0.86     20760
 
-    accuracy                           0.92    513915
-   macro avg       0.92      0.92      0.92    513915
-weighted avg       0.92      0.92      0.92    513915
+    accuracy                           0.73     39573
+   macro avg       0.51      0.44      0.43     39573
+weighted avg       0.66      0.73      0.67     39573
 
-Valid RMSLE: 0.120
-F1_score : 92.28%
+F1_micro/Acc : 72.79% 
 ```
-
-```
-plot_learning_curve(sgd,'SGD', X=X, y=y, scoring='neg_mean_squared_log_error', n_jobs=4)
-```
-Output:
-![SGD](https://user-images.githubusercontent.com/23128332/63510611-ab2f3d00-c4e7-11e9-9043-2c24ab7f4372.JPG)
 
 ```
 plot_learning_curve(sgd,'SGD', X=X, y=y, scoring='accuracy', n_jobs=4)
 ```
 Output:
-![SGDacc](https://user-images.githubusercontent.com/23128332/63510612-abc7d380-c4e7-11e9-8f4b-318e697d1f9f.JPG)
+![SGD](https://user-images.githubusercontent.com/23128332/63623221-b1b1d780-c601-11e9-9982-b811c1ae08c0.JPG)
 
 ```
 eli5.show_weights(sgd, vec=tfidf, top=40)
 ```
 Output:
-[sgdWords](https://user-images.githubusercontent.com/23128332/63510609-ab2f3d00-c4e7-11e9-8581-563d87548455.JPG)
+![SGDwords](https://user-images.githubusercontent.com/23128332/63623208-b080aa80-c601-11e9-982c-dc232d7e16fa.JPG)
+
 
 ## Linear Support Vector Classifier
 ```
 from sklearn.svm import LinearSVC
 svc = LinearSVC()
-svc, svc_preds = model_eval(svc)
-pickle.dump(svc ,open("linearSVC109.sav", 'wb'))  # Save the model
+svc, svc_preds = simple_eval(svc,X,y)
 ```
 Output:
 ```
-Fold0, F1_score : 93.70%
-Fold1, F1_score : 93.66%
-Fold2, F1_score : 93.52%
-Fold3, F1_score : 93.54%
-Fold4, F1_score : 93.58%
-[[ 99378   1458    764    364    819]
- [   820 101308    338    225     92]
- [   348    286  99452   1803    894]
- [   314    183   1451  93074   7761]
- [  1703    386   1714  11170  87810]]
               precision    recall  f1-score   support
 
-           1       0.97      0.97      0.97    102783
-           2       0.98      0.99      0.98    102783
-           3       0.96      0.97      0.96    102783
-           4       0.87      0.91      0.89    102783
-           5       0.90      0.85      0.88    102783
+      1 Star       0.72      0.83      0.77      8390
+     2 Stars       0.25      0.12      0.16      2450
+     3 Stars       0.31      0.19      0.23      2807
+     4 Stars       0.39      0.24      0.30      5166
+     5 Stars       0.81      0.92      0.86     20760
 
-    accuracy                           0.94    513915
-   macro avg       0.94      0.94      0.94    513915
-weighted avg       0.94      0.94      0.94    513915
+    accuracy                           0.71     39573
+   macro avg       0.49      0.46      0.46     39573
+weighted avg       0.66      0.71      0.68     39573
 
-Valid RMSLE: 0.109
-F1_score : 93.60% 
+F1_micro/Acc : 71.31% 
 ```
 
 ```
 eli5.show_weights(svc, vec=tfidf, top=40)
 ```
 Output:
-![SVCwords](https://user-images.githubusercontent.com/23128332/63510979-a919ae00-c4e8-11e9-9b56-b932c82929d7.JPG)
+![SVCwords](https://user-images.githubusercontent.com/23128332/63623671-dbb7c980-c602-11e9-9f4e-5d067d19028c.JPG)
 
 # MultinomialNB()
 ```
 from sklearn.naive_bayes import MultinomialNB
 MNB = MultinomialNB()
-MNB, MNB_preds = model_eval(MNB)
-pickle.dump(MNB ,open("MultinomialNB.sav", 'wb'))
+MNB, MNB_preds = simple_eval(MNB)
 ```
 Output:
 ```
-Fold0, F1_score : 83.20%
-Fold1, F1_score : 83.33%
-Fold2, F1_score : 82.88%
-Fold3, F1_score : 83.10%
-Fold4, F1_score : 83.29%
-[[87558 10732  3420   775   298]
- [ 2554 98448  1093   488   200]
- [ 1955  1601 94962  2787  1478]
- [ 1245  2778  4467 84349  9944]
- [ 1897  3287  5178 30383 62038]]
               precision    recall  f1-score   support
 
-           1       0.92      0.85      0.88    102783
-           2       0.84      0.96      0.90    102783
-           3       0.87      0.92      0.90    102783
-           4       0.71      0.82      0.76    102783
-           5       0.84      0.60      0.70    102783
+      1 Star       0.65      0.91      0.76      8390
+     2 Stars       0.50      0.00      0.00      2450
+     3 Stars       0.49      0.02      0.03      2807
+     4 Stars       0.40      0.16      0.23      5166
+     5 Stars       0.77      0.96      0.85     20760
 
-    accuracy                           0.83    513915
-   macro avg       0.84      0.83      0.83    513915
-weighted avg       0.84      0.83      0.83    513915
+    accuracy                           0.72     39573
+   macro avg       0.56      0.41      0.37     39573
+weighted avg       0.66      0.72      0.64     39573
 
-Valid RMSLE: 0.169
-F1_score : 83.16% 
+F1_micro/Acc : 71.56% 
 ```
 
 
@@ -817,27 +1015,7 @@ pickle.dump(svc ,open("bigoltree.sav", 'wb'))
 ```
 Output:
 ```
-Fold0, F1_score : 89.21%
-Fold1, F1_score : 89.19%
-[[ 96271   1657   1225   1244   2386]
- [  1568 100168    405    364    278]
- [  1344    388  97485   2177   1389]
- [  2492    455   2165  86530  11141]
- [  7745    835   2390  13860  77953]]
-              precision    recall  f1-score   support
 
-           1       0.88      0.94      0.91    102783
-           2       0.97      0.97      0.97    102783
-           3       0.94      0.95      0.94    102783
-           4       0.83      0.84      0.84    102783
-           5       0.84      0.76      0.80    102783
-
-    accuracy                           0.89    513915
-   macro avg       0.89      0.89      0.89    513915
-weighted avg       0.89      0.89      0.89    513915
-
-Valid RMSLE: 0.195
-F1_score : 89.20% 
 ```
 
 ```
@@ -870,17 +1048,24 @@ import lightgbm as lgb
 from lightgbm import LGBMClassifier
 
 model = LGBMClassifier()
-lgb_model, lgb_preds = model_eval(model)
+lgb_model, lgb_preds = simple_eval(model)
 ```
 Output:
 ```
-```
+              precision    recall  f1-score   support
 
-```
-eli5.show_weights(lgb_model, vec=tfidf, top=40)
-```
-Output:
+      1 Star       0.68      0.83      0.75      8390
+     2 Stars       0.30      0.05      0.09      2450
+     3 Stars       0.39      0.13      0.20      2807
+     4 Stars       0.42      0.20      0.27      5166
+     5 Stars       0.77      0.94      0.85     20760
 
+    accuracy                           0.71     39573
+   macro avg       0.51      0.43      0.43     39573
+weighted avg       0.65      0.71      0.66     39573
+
+F1_micro/Acc : 70.91%
+```
 
 # Neural Networks
 ```
@@ -958,90 +1143,17 @@ model.save_weights('wo_gru_weights.h5')
 ```
 Output:
 ```
+              precision    recall  f1-score   support
 
+           1       0.62      0.86      0.72      8324
+           2       0.00      0.00      0.00      2470
+           3       0.00      0.00      0.00      2799
+           4       0.29      0.01      0.01      5337
+           5       0.72      0.97      0.82     20643
+
+    accuracy                           0.69     39573
+   macro avg       0.32      0.37      0.31     39573
+weighted avg       0.54      0.69      0.58     39573
 ```
+![NNresult](https://user-images.githubusercontent.com/23128332/63623215-b1194100-c601-11e9-9e92-144689868e57.JPG)
 
-
-## Blending
-```
-# Simple Averaging
-blend = (svc_preds + sgd_preds + MNB_preds + tree_preds + lgb_preds + (np.argmax(NN_preds,axis=1)+1))/6
-blend = pd.Series(map(round,blend))
-print('Valid RMSLE: {:.2f}'.format(np.sqrt(mean_squared_log_error(y, blend))))
-print('F1_score : {:.2%}'.format(f1_score(y, blend, average='micro')))
-
-hoter = lambda array: ohe.transform(array.values.reshape(-1,1)).toarray()
-
-```
-Output:
-```
-
-```
-
-### Voting Classifier
-```
-from sklearn.ensemble import VotingClassifier
-
-voter = VotingClassifier(estimators=[('SGD',sgd),
-                                     ('SVC',svc),
-                                     ('MNB',MNB),
-                                     ('tree',tree),
-                                     ('lgb',lgb_model),
-                                    ('GRU',model)],
-                            voting='hard')
-
-voter, voter_preds = model_eval(voter)
-```
-
-Output:
-```
-
-```
-
-## Stacking
-```
-stacked_preds = pd.DataFrame({
-    'logr_preds':logr_preds,
-    'sgd_preds':sgd_preds,
-    'svc_preds':svc_preds,
-    'MNB_preds':MNB_preds,
-    'tree_preds':tree_preds,
-    'lgb_preds':lgb_preds,
-    'blend_preds':blend,
-    'NN_preds':np.argmax(NN_preds, axis=1)+1
-})
-
-stacked_preds.to_csv('stacked_preds.csv',index=False)
-```
-### Stacking with XGBoost Classifier
-```
-from xgboost import XGBClassifier
-s_train, s_test, y_train, y_test = train_test_split(stacked_preds, y, test_size=0.2, random_state=10)
-
-xgb = XGBClassifier(n_jobs=-1)
-xgb.fit(s_train,y_train)
-stack_pred = xgb.predict(s_test)
-
-print(confusion_matrix(stack_pred, y_test))
-print(classification_report(stack_pred, y_test))
-print('Valid RMSLE: {:.3f}'.format(np.sqrt(mean_squared_log_error(stack_pred, y_test))))
-print("F1_score : {:.2%} ".format(f1_score(y_test, stack_pred, average='micro')))
-```
-Output:
-```
-
-```
-
-Output:
-
-
-## Things to do:
-```
-1- Gather more data.
-2- Make research for better NLP techniques.
-3- Feature engineering
-4- Model optimizations
-5- More models for stacking
-
-- Sentimental Analysis
-```
