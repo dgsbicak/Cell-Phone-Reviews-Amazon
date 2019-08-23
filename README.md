@@ -1015,7 +1015,19 @@ pickle.dump(svc ,open("bigoltree.sav", 'wb'))
 ```
 Output:
 ```
+              precision    recall  f1-score   support
 
+      1 Star       0.61      0.83      0.70      8361
+     2 Stars       0.21      0.03      0.05      2489
+     3 Stars       0.27      0.06      0.10      2810
+     4 Stars       0.36      0.09      0.15      5335
+     5 Stars       0.74      0.93      0.82     20578
+
+    accuracy                           0.68     39573
+   macro avg       0.44      0.39      0.36     39573
+weighted avg       0.59      0.68      0.61     39573
+
+F1_micro/Acc : 67.55% 
 ```
 
 ```
@@ -1039,7 +1051,7 @@ fig = go.Figure(data=[trace], layout=layout)
 py.iplot(fig)
 ```
 Output:
-![image](https://user-images.githubusercontent.com/23128332/63511166-1f1e1500-c4e9-11e9-9cd0-d67d9d561637.png)
+![treefeat](https://user-images.githubusercontent.com/23128332/63623942-ad86b980-c603-11e9-8753-15c6040d5522.JPG)
 
 
 ## Lightgbm
@@ -1068,79 +1080,78 @@ F1_micro/Acc : 70.91%
 ```
 
 # Neural Networks
-```
-from keras import layers
-from keras.models import Sequential
-from keras.optimizers import Adam
-import tensorflow as tf
 
-gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.7)
-gpu_name = tf.test.gpu_device_name()
-session_conf = tf.ConfigProto(intra_op_parallelism_threads=44,
-                             inter_op_parallelism_threads=44,
-                             allow_soft_placement=True,
-                             gpu_options=gpu_options)
-sess = tf.Session(graph=tf.get_default_graph(),
-                 config=session_conf)
-session_conf.gpu_options.allow_growth=True
+```
+#Load data
+df = pd.read_csv('cleaned_amazon_yuge.csv')
+df.dropna(axis=0, inplace=True)
+df.reset_index(drop=True, inplace=True)
+
+X = df['Text']
+y = df['Stars']
+
+# Calculate Class Weights
+from sklearn.utils import class_weight
+class_weights = class_weight.compute_class_weight('balanced',
+                                                 np.unique(y),
+                                                 y)
+
+# Tokenizing the data and pad sequences
+xtrain,xtest,ytrain,ytest = train_test_split(X,y,test_size=0.2,random_state=10)
+tokenizer = text.Tokenizer()
+tokenizer.fit_on_texts(X)
+del df,X,y
+gc.collect()
+
+xtrain = tokenizer.texts_to_sequences(xtrain)
+xtest  = tokenizer.texts_to_sequences(xtest)
+xtrain = sequence.pad_sequences(xtrain)
+xtest = sequence.pad_sequences(xtest)
+
+ytrain = ohe.transform(ytrain.values.reshape(-1,1))
+ytest = ohe.transform(ytest.values.reshape(-1,1))
+
 
 def build_model():
     embed_dim = 10
     nlabels=5
     hidden_u = 1
     conv_u = 4
-    attention_u = 10
-
+    attention_u = 5
+    
     model = Sequential()
-    model.add(layers.embeddings.Embedding(xtrain.shape[1], embed_dim, trainable=True))
-    #model.add(layers.GRU(units=hidden_u))#, dropout=0.1, recurrent_dropout=0.1))
+    model.add(layers.Embedding(xtrain.shape[1], embed_dim, trainable=True))
+    #model.add(layers.Conv1D(conv_u, 5, activation='relu'))
+    #model.add(layers.GRU(units=hidden_u), dropout=0.2, recurrent_dropout=0.2))
+    
     model.add(layers.GlobalMaxPool1D())
-    model.add(layers.Dense(attention_u, activation = 'relu'))
-    """
-    model.add(layers.Dropout(0.25))
-    model.add(layers.Dense(1, activation = None))
-    model.add(layers.Dense(attention_u, activation = 'softmax'))
-    """
-    model.add(layers.Dense(nlabels, activation='sigmoid')) #'sigmoid'
+    #model.add(layers.Dense(attention_u, activation = 'relu'))
+    #model.add(layers.Dropout(0.5))
+    #model.add(layers.Dense(attention_u, activation='relu'))
+    model.add(layers.Dense(nlabels, activation='softmax')) #'sigmoid'
     model.compile(loss='categorical_crossentropy',
                  optimizer='adam',# optimizer.SGD(lr=1e-3)
-                 metrics=['categorical_accuracy'])
+                 metrics=['acc'])
     return model
-
-xtrain,xtest,ytrain,ytest = train_test_split(X,y,test_size=0.2,random_state=10,shuffle=False)
-
-from keras.preprocessing import text, sequence
-tokenizer = text.Tokenizer()
-tokenizer.fit_on_texts(X)
-del X,y
-
-xtrain = tokenizer.texts_to_sequences(xtrain)
-xtest  = tokenizer.texts_to_sequences(xtest)
-xtrain = sequence.pad_sequences(xtrain)
-xtest = sequence.pad_sequences(xtest)
-    
-ytrain = ohe.transform(ytrain.values.reshape(-1,1))
-ytest = ohe.transform(ytest.values.reshape(-1,1))
 
 batch=10000
 epoch=40
+
 model = build_model()
 history = model.fit(xtrain, ytrain,
                     validation_split=0.2,
                     epochs=epoch,
-                    batch_size=batch)
+                    batch_size=batch,
+                   class_weight=class_weights)
 score, acc = model.evaluate(xtest, ytest,
                             batch_size=batch)
 
 NN_preds = model.predict(xtest,batch_size=batch)
-print(confusion_matrix(np.argmax(ytest, axis=1)+1, np.argmax(NN_preds, axis=1)+1))
 print(classification_report(np.argmax(ytest, axis=1)+1, np.argmax(NN_preds, axis=1)+1))
-print('Valid RMSLE: {:.3f}'.format(np.sqrt(mean_squared_log_error(ytest.toarray(), NN_preds))))
-print("F1_score : {:.2%} ".format(f1_score(np.argmax(ytest, axis=1)+1, np.argmax(NN_preds, axis=1)+1, average='micro')))
-print("Accuracy: {:.2f}".format(accuracy_score(np.argmax(ytest, axis=1)+1, np.argmax(NN_preds, axis=1)+1)))
 plot_history(history)
-model.save_weights('wo_gru_weights.h5')
 ```
+
+
 Output:
 ```
               precision    recall  f1-score   support
