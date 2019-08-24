@@ -1106,7 +1106,7 @@ F1_micro/Acc : 70.91%
 # Neural Networks
 Embedding, LSTM, GRU and other tactics resulted in limited success. 
 
-Note: Transfer Learning: Spacy, GloVe embeddings should be tested next.
+Transfer Learning might help (Spacy, GloVe embeddings).
 
 ```
 #Load data
