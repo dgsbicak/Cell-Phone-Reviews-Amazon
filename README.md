@@ -735,6 +735,15 @@ Class Distribution for RandomOverSampler:
 Logistic regression gives good performance. After testing various over & under sampling techniques, the method that gives the best results will be chosen.
 
 #### Training on the original data
+The model's ability to predict 1 & 5 starred reviews is very good, however 2nd,3rd and 4th classes has very low recall values(High false negatives), and low precision values (Low true positives).
+Reasons for this:
+
+1-) Imbalanced data can cause the model to ignore minority classes and overfit the majority class.
+2-) Needs more data. 10-20k text data is not enough to help the model successfully distinguish a 2 or 3 starred review from other classes.
+3-) It would be very hard even for a human to distinguish between 2 or 3 starred review from one another or 4 and 5 starred review. A fair error rate is expected.
+4-) 1 & 5 starred reviews are two opposite end of the spectrum. Those reviews contain distinctive words more often, such as "garbage","sucks","excellent", etc. 
+
+
 ```
 logr = LogisticRegression(solver='sag',multi_class="multinomial",n_jobs=-1)
 logr, logr_preds = simple_eval(logr,X,y)
@@ -757,6 +766,9 @@ F1_micro/Acc : 72.72%
 ```
 
 #### Training on the original data with Class Weights
+Assigning higher class weights causes the model to be more punishing on false predictions. 
+There is a trade off between majority and minority class scores, when minority (2,3,4) recall values get higher, majority (1 and 5) recall values get lower which causes the model accuracy to be lower, because of the amount of support is much higher and lower recall has a greater impact on overall score.
+Trying out different weights didn't help as well.
 ```
 class_weights = class_weight.compute_class_weight('balanced',np.unique(y),y)
 class_weights = {clss+1: weight for clss, weight in enumerate(class_weights)}
@@ -785,6 +797,8 @@ F1_micro/Acc : 65.26%
 ```
 
 #### Synthetic Minority Over-sampling (SMOTE) Method Result
+SMOTE and other over-sampling methods didn't help as well. Pretty much resulted the same as before, recall trade-off between classes.
+The major issue is the scarcity of information in the data. Over sampling doesn't increase the overall information.
 ```
 # Apply SMOTE on Tfidf vector
 logr = LogisticRegression(solver='sag',multi_class="multinomial",n_jobs=-1)
@@ -866,50 +880,55 @@ Class Distribution for RandomUnderSampler:
  ```
 
 #### Results
-
-Nearmiss version-2 and RandomUnderSampler yields best results among other under sampling methods, but fails to pass the success of the first model that trained on the original data, mainly due to the discarded 1&5 Starred reviews, which makes up the most of the data.
+RandomUnderSampler and Nearmiss version-2 yields best results among other under sampling methods, but fails to pass the success of the first model that trained on the original data mainly due to the scarcity of training data and inability to distinguish between similar classes. ~40% recall ~25% precision on 2-3-4 Star classes indicates the model is trying hard to find them, but fails.
+This model can be used in stacking and blending, because of the relative success in finding minority classes.
 
 ```
-logr = LogisticRegression(solver='sag',multi_class="multinomial",class_weight=class_weights,n_jobs=-1)
-simple_eval(logr,X_nm2, y_nm2)
+logr = LogisticRegression(solver='sag',multi_class="multinomial",n_jobs=-1)
+simple_eval(logr,X_rus, y_rus)
 ```
-NearMiss Version-2
+RandomUnderSampler
 Output:
 ```
-                precision    recall  f1-score   support
-      1 Star       0.87      0.31      0.46      8390
-     2 Stars       0.15      0.61      0.24      2450
-     3 Stars       0.19      0.46      0.27      2807
-     4 Stars       0.20      0.50      0.29      5166
-     5 Stars       0.95      0.30      0.45     20760
+              precision    recall  f1-score   support
 
-    accuracy                           0.36     39573
-   macro avg       0.47      0.44      0.34     39573
-weighted avg       0.73      0.36      0.40     39573
+      1 Star       0.77      0.66      0.71      8440
+     2 Stars       0.22      0.40      0.29      2434
+     3 Stars       0.26      0.40      0.32      2832
+     4 Stars       0.31      0.45      0.36      5288
+     5 Stars       0.89      0.69      0.78     20579
 
-F1_micro/Acc : 35.75% 
+    accuracy                           0.61     39573
+   macro avg       0.49      0.52      0.49     39573
+weighted avg       0.70      0.61      0.65     39573
+
+F1_micro/Acc : 61.27% 
 ```
 
 NearMiss Version-1
 ```
-F1_micro/Acc : 23.17% 
+F1_micro/Acc : 39.42% 
+```
+NearMiss Version-2
+```
+F1_micro/Acc : 60.18% 
 ```
 NearMiss Version-3
 ```
-F1_micro/Acc : 6.66%
-```
-RandomUnderSampler
-```
-F1_micro/Acc : 33.51% 
+F1_micro/Acc : 16.98% 
 ```
 
-### Moving on with the original data
+### Moving on with the original data and no class weight assignment
+
 ### LogisticRegression
-```
-plot_learning_curve(logr,'Logistic Regression', X=X, y=y, n_jobs=4)
-```
-Output:
-![LogR](https://user-images.githubusercontent.com/23128332/63623210-b1194100-c601-11e9-85e1-fc7f834a0fc2.JPG)
+Image shows the top Tfidf features and their weights measured by the first logistic regression model, which trained on the original data and had no class weights assigned.
+
+At first glance, we can see that there is no leakage left in the data. Some review texts contained target information, such as "gave two stars"; also phone brand and model information could had a similar affect.
+
+It's hard to distinguish close classes from one another. You can see common words in different classes, such as "perfect","awesome","love", etc. are common in 4th and 5th classes. 1 and 2 starred reviews share features like "defective", "not", "not a good", "bad", etc.
+
+Learning graph shows high bias and high variance, the model needs much more high quality data to improve the results
+-We can't see from the top features but there are few garbage data in the reviews (spam, misleading review, etc.) which decreases the overall quality of the data a bit.
 
 ```
 eli5.show_weights(logr, vec=tfidf, top=40)
@@ -917,6 +936,11 @@ eli5.show_weights(logr, vec=tfidf, top=40)
 Output:
 ![logwords](https://user-images.githubusercontent.com/23128332/63623212-b1194100-c601-11e9-961c-500926cf4b2f.JPG)
 
+```
+plot_learning_curve(logr,'Logistic Regression', X=X, y=y, n_jobs=4)
+```
+Output:
+![LogR](https://user-images.githubusercontent.com/23128332/63638115-c5eee680-c68c-11e9-9f67-e55edea3ad8d.JPG)
 
 ## Stochastic Gradient Descent Classifier
 ```
@@ -1080,6 +1104,9 @@ F1_micro/Acc : 70.91%
 ```
 
 # Neural Networks
+Embedding, LSTM, GRU and other tactics resulted in limited success. 
+
+Note: Transfer Learning: Spacy, GloVe embeddings should be tested next.
 
 ```
 #Load data
@@ -1121,7 +1148,6 @@ def build_model():
     
     model = Sequential()
     model.add(layers.Embedding(xtrain.shape[1], embed_dim, trainable=True))
-    #model.add(layers.Conv1D(conv_u, 5, activation='relu'))
     #model.add(layers.GRU(units=hidden_u), dropout=0.2, recurrent_dropout=0.2))
     
     model.add(layers.GlobalMaxPool1D())
@@ -1156,15 +1182,16 @@ Output:
 ```
               precision    recall  f1-score   support
 
-           1       0.62      0.86      0.72      8324
+           1       0.63      0.84      0.72      8324
            2       0.00      0.00      0.00      2470
            3       0.00      0.00      0.00      2799
-           4       0.29      0.01      0.01      5337
-           5       0.72      0.97      0.82     20643
+           4       0.00      0.00      0.00      5337
+           5       0.70      0.97      0.81     20643
 
-    accuracy                           0.69     39573
-   macro avg       0.32      0.37      0.31     39573
-weighted avg       0.54      0.69      0.58     39573
+    accuracy                           0.68     39573
+   macro avg       0.27      0.36      0.31     39573
+weighted avg       0.50      0.68      0.57     39573
 ```
-![NNresult](https://user-images.githubusercontent.com/23128332/63623215-b1194100-c601-11e9-9e92-144689868e57.JPG)
+![image](https://user-images.githubusercontent.com/23128332/63638136-15351700-c68d-11e9-921b-29a8470f9577.png)
+
 
