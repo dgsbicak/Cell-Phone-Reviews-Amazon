@@ -830,11 +830,6 @@ Class Distribution for RandomOverSampler:
  Counter({5: 82023, 1: 82023, 3: 82023, 4: 82023, 2: 82023})
 ```
 
-#### Synthetic Minority Over-sampling (SMOTE) Method Result
-SMOTE and other over-sampling methods didn't help as well. Pretty much resulted the same as before, recall trade-off between classes.
-The major issue is the scarcity of information in the data. Over sampling doesn't increase the overall information.
-
-
 #### Apply SMOTE on Tfidf vector
 ```
 logr = LogisticRegression(solver='sag',multi_class="multinomial",n_jobs=-1)
