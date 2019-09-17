@@ -461,16 +461,28 @@ print(df['Text'][0],"\n")
 ```
 Output:
 ```
-really really good! it's like a new phone, no scratches, i'm really happy with it, just the charger is not original but i don't care, it's good enough nice! 
+Preprocessing Comments.. 
 
-Deleting model informations
-Deleting brand names...
-Adjusting characters, trimming escape characters, symbols...
+# Make everything lowercase for the simplicity.
+# Merge Comments and Titles
+it works really well a couple times it turned off and tried to reboot itelf. it could've just been like updating i'm not sure, this is my first iphone but other than that it works really well. it rebooted more time but it hasn't done it again. there were no scratches or anything. it looks really nice and everything works so far. the seller even emailed me and said if i wasn't 100% satisfied to contact them. i am very happy with the phone and it even worked with straight talk. would buy again 😊 
 
-really really good it s like a phone scratches i m really happy it just the charger is not original but i don t care it s good enough nice 
+# Delete Unnecessary Text
 
-Deleting punctuations...
-really really good it s like a phone scratches i m really happy it just the charger is not original but i don t care it s good enough nice 
+it works really well a couple times it turned off and tried to reboot itelf. it could've just been like updating i'm not sure, this is my first iphone but other than that it works really well. it rebooted more time but it hasn't done it again. there were no scratches or anything. it looks really nice and everything works so far. the seller even emailed me and said if i wasn't 100% satisfied to contact them. i am very happy with the phone and it even worked with straight talk. would buy again 😊 
+
+# Deleting model informations
+
+# Deleting brand names...
+
+# Adjusting characters, trimming escape characters, symbols...
+
+it works really well a couple times it turned off and tried reboot itelf it couldve just been like updating im not sure this is my but other than that it works really well it rebooted more time but it hasnt done it again there were scratches anything it looks really nice and everything works so far the seller even emailed me and said if i wasnt satisfied contact them i am very happy the and it even worked talk would buy again 
+
+# Discard rows with empty Text...
+
+# Discard rows that have less than 2 characters...
+
 ```
 
 ## Outliers
@@ -636,7 +648,7 @@ py.iplot(fig, filename='word-plots')
 ```
 Output:
 
-![newplot (2)](https://user-images.githubusercontent.com/23128332/58369285-ea59ec00-7f00-11e9-8f3f-6a9808905e13.png)
+![newplot (1)](https://user-images.githubusercontent.com/23128332/65023401-6a3a1500-d93b-11e9-9bc4-6a52c5dee813.png)
 
 ## Bigram Count Plots
 
@@ -669,18 +681,16 @@ py.iplot(fig, filename='word-plots')
 ```
 Output:
 
-![newplot (3)](https://user-images.githubusercontent.com/23128332/58369286-ea59ec00-7f00-11e9-8a84-60b4ccedca22.png)
+![newplot](https://user-images.githubusercontent.com/23128332/65023366-568eae80-d93b-11e9-91ff-45f1fe7bd626.png)
 
 # Part 2: Algorithm Training
 
 ```
 # Load the Data
 df = pd.read_csv('cleaned_amazon_yuge.csv')
-df = df.dropna(axis=0).sample(frac=1.0).reset_index(drop=True)
-TEST = df[int(len(df)*0.80):]  # 20%
-df = df[:int(len(df)*0.80)]  # 80%
-X = df['Text']
-y = df['Stars']
+df = df.sample(frac=1.0, random_state=13).reset_index(drop=True)
+
+X, test_X, y, test_y = train_test_split(df['Text'], df['Stars'], test_size=0.2, random_state=10, shuffle=True)
 ```
 
 ## Vectorization
@@ -689,52 +699,84 @@ y = df['Stars']
 tfidf = TfidfVectorizer(token_pattern=r'\w{1,}',
                         ngram_range=(1, 3),
                         max_df=0.5,
-                        max_features=100000)
+                        min_df=3,
+                        max_features=100000,
+                        strip_accents='unicode'
+                        #decode_error='ignore',
+                       )
 
 tfidf.fit(X)
-X = tfidf.transform(X)
-y = df['Stars']
-
-test_X = tfidf.transform(TEST['Text'])
-test_y = TEST['Stars']
+X_tf = tfidf.transform(X)
+test_X_tf = tfidf.transform(test_X)
+```
+### CountVectorizer
+```
+from sklearn.feature_extraction.text import CountVectorizer
+count = CountVectorizer(ngram_range=(1, 3),
+                            max_df=0.5,
+                            analyzer='word',
+                            token_pattern = r'\w{1,}',
+                       max_features=100000)
+count.fit(X)
+X_cv = count.transform(X)
+test_X_cv = count.transform(test_X)
 ```
 
 ## Model Building
-
-### Over-Sampling Using SMOTE, ADASYN,RandomOverSampler
+### Tfidf & CountVectorizer & Scaling
+Model shows better performance with Tfidf method. Tfidf will be used later on.
 ```
-# Standard Data Class Distribution
-print("Class Distribution for Standard Data:\n",Counter(y))
+# Tfidf Not Scaled
+# Tfidf method scales the data, usually additional scaling isn't needed.
+logr = LogisticRegression(solver='sag',multi_class="multinomial",n_jobs=-1)
+a = simple_eval(logr, X_tf, y, test_X_tf)
 
-# Apply SMOTE on Tfidf vector
-smote = SMOTE(sampling_strategy='auto', random_state=10,n_jobs=-1)
-X_smote, y_smote = smote.fit_sample(X,y)
-print("Class Distribution for SMOTE:\n",Counter(y_smote))
+>>
+F1_micro/Acc : 73.54% 
+Log Loss: 0.72
 
-ada = ADASYN(sampling_strategy='not majority', random_state=10,n_jobs=-1)
-X_ada, y_ada = ada.fit_sample(X,y)
-print("Class Distribution for ADASYN:\n",Counter(y_ada))
+# CountVectorizer Not Scaled
+logr = LogisticRegression(solver='sag',multi_class="multinomial",n_jobs=-1)
+a = simple_eval(logr, X_cv, y, test_X_cv)
 
-rsamp = RandomOverSampler(random_state=10)
-X_ra, y_ra = rsamp.fit_sample(X,y)
-print("Class Distribution for RandomOverSampler:\n",Counter(y_ra))
-```
-Output:
-```
-Class Distribution for Standard Data:
- Counter({5: 82023, 1: 33491, 4: 21468, 3: 11387, 2: 9921})
-Class Distribution for SMOTE:
- Counter({5: 82023, 1: 82023, 3: 82023, 4: 82023, 2: 82023})
-Class Distribution for ADASYN:
- Counter({2: 84952, 4: 82561, 3: 82370, 5: 82023, 1: 78497})
-Class Distribution for RandomOverSampler:
- Counter({5: 82023, 1: 82023, 3: 82023, 4: 82023, 2: 82023})
+>>
+F1_micro/Acc : 72.10% 
+Log Loss: 0.85
 ```
 
-### Over-Sampled Data Training with Logistic Regression
+```
+from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import normalize
+
+X_tf_l2 = normalize(X_tf)
+X_tf_l2_te = normalize(test_X_tf)
+
+X_cv_l2 = normalize(X_cv)
+X_cv_l2_te = normalize(test_X_cv)
+
+# Scaled Data
+# Tfidf Used
+logr = LogisticRegression(solver='sag',multi_class="multinomial",n_jobs=-1)
+a = simple_eval(logr, X_tf_l2, y, X_tf_l2_te)
+
+>>
+tfidf
+F1_micro/Acc : 73.54% 
+Log Loss: 0.72
+
+# CountVectorizer Used
+logr = LogisticRegression(solver='sag',multi_class="multinomial",n_jobs=-1)
+a = simple_eval(logr, X_cv_l2, y, X_cv_l2_te)
+
+>>
+CVec
+F1_micro/Acc : 73.44% 
+Log Loss: 0.72
+```
+
+## Dealing with Imbalanced Classes
 Logistic regression gives good performance. After testing various over & under sampling techniques, the method that gives the best results will be chosen.
 
-#### Training on the original data
 The model's ability to predict 1 & 5 starred reviews is very good, however 2nd,3rd and 4th classes has very low recall values(High false negatives), and low precision values (Low true positives).
 Reasons for this:
 
@@ -743,29 +785,7 @@ Reasons for this:
 3-) It would be very hard even for a human to distinguish between 2 or 3 starred review from one another or 4 and 5 starred review. A fair error rate is expected.
 4-) 1 & 5 starred reviews are two opposite end of the spectrum. Those reviews contain distinctive words more often, such as "garbage","sucks","excellent", etc. 
 
-
-```
-logr = LogisticRegression(solver='sag',multi_class="multinomial",n_jobs=-1)
-logr, logr_preds = simple_eval(logr,X,y)
-```
-Output:
-```
-              precision    recall  f1-score   support
-
-      1 Star       0.71      0.88      0.79      8361
-     2 Stars       0.32      0.08      0.12      2489
-     3 Stars       0.38      0.19      0.26      2810
-     4 Stars       0.45      0.22      0.30      5335
-     5 Stars       0.80      0.95      0.86     20578
-
-    accuracy                           0.73     39573
-   macro avg       0.53      0.46      0.47     39573
-weighted avg       0.67      0.73      0.68     39573
-
-F1_micro/Acc : 72.72% 
-```
-
-#### Training on the original data with Class Weights
+### Assigning Class Weights
 Assigning higher class weights causes the model to be more punishing on false predictions. 
 There is a trade off between majority and minority class scores, when minority (2,3,4) recall values get higher, majority (1 and 5) recall values get lower which causes the model accuracy to be lower, because of the amount of support is much higher and lower recall has a greater impact on overall score.
 Trying out different weights didn't help as well.
@@ -776,7 +796,7 @@ print(class_weights)
 
 # Training on the standard data with class weights.
 logr = LogisticRegression(solver='sag',multi_class="multinomial",class_weight=class_weights,n_jobs=-1)
-simple_eval(logr,X,y)
+a = simple_eval(logr, X_tf, y, test_X_tf)
 ```
 Output:
 ```
@@ -794,134 +814,212 @@ Output:
 weighted avg       0.71      0.65      0.68     39573
 
 F1_micro/Acc : 65.26% 
+Log Loss: 0.87
+```
+
+### Over-Sampling Using SMOTE, ADASYN,RandomOverSampler
+SMOTE and other over-sampling methods didn't help as well. Pretty much resulted the same as before, recall trade-off between classes.
+The major issue is the scarcity of information in the data. Over sampling doesn't increase the overall information.
+```
+from imblearn.over_sampling import SMOTE, ADASYN, RandomOverSampler
+# Standard Data Class Distribution
+print("Class Distribution for Standard Data:\n",Counter(y))
+
+# Apply SMOTE on Tfidf vector
+smote = SMOTE(sampling_strategy='auto', random_state=10,n_jobs=-1)
+X_smote, y_smote = smote.fit_sample(X_tf,y)
+print("Class Distribution for SMOTE:\n",Counter(y_smote))
+
+ada = ADASYN(sampling_strategy='not majority', random_state=10,n_jobs=-1)
+X_ada, y_ada = ada.fit_sample(X_tf,y)
+print("Class Distribution for ADASYN:\n",Counter(y_ada))
+
+rsamp = RandomOverSampler(random_state=10)
+X_ra, y_ra = rsamp.fit_sample(X_tf,y)
+print("Class Distribution for RandomOverSampler:\n",Counter(y_ra))
+```
+Output:
+```
+Class Distribution for Standard Data:
+ Counter({5: 82023, 1: 33491, 4: 21468, 3: 11387, 2: 9921})
+Class Distribution for SMOTE:
+ Counter({5: 82023, 1: 82023, 3: 82023, 4: 82023, 2: 82023})
+Class Distribution for ADASYN:
+ Counter({2: 84952, 4: 82561, 3: 82370, 5: 82023, 1: 78497})
+Class Distribution for RandomOverSampler:
+ Counter({5: 82023, 1: 82023, 3: 82023, 4: 82023, 2: 82023})
 ```
 
 #### Synthetic Minority Over-sampling (SMOTE) Method Result
 SMOTE and other over-sampling methods didn't help as well. Pretty much resulted the same as before, recall trade-off between classes.
 The major issue is the scarcity of information in the data. Over sampling doesn't increase the overall information.
+
+
+#### Apply SMOTE on Tfidf vector
 ```
-# Apply SMOTE on Tfidf vector
 logr = LogisticRegression(solver='sag',multi_class="multinomial",n_jobs=-1)
-simple_eval(logr,X_smote, y_smote)
+a = simple_eval(logr, X_smote, y_smote, test_X_tf)
 ```
 Output:
 ```
-              precision    recall  f1-score   support
+      1 Star       0.74      0.76      0.75      7480
+     2 Stars       0.21      0.24      0.22      2132
+     3 Stars       0.28      0.34      0.31      2474
+     4 Stars       0.33      0.37      0.35      4667
+     5 Stars       0.87      0.78      0.82     19142
 
-      1 Star       0.76      0.75      0.75      8390
-     2 Stars       0.23      0.29      0.25      2450
-     3 Stars       0.26      0.37      0.31      2807
-     4 Stars       0.34      0.40      0.37      5166
-     5 Stars       0.88      0.76      0.81     20760
-
-    accuracy                           0.66     39573
-   macro avg       0.49      0.52      0.50     39573
-weighted avg       0.70      0.66      0.67     39573
-
-F1_micro/Acc : 65.50% 
+    accuracy                           0.66     35895
+   macro avg       0.48      0.50      0.49     35895
+weighted avg       0.69      0.66      0.67     35895
+F1_micro/Acc : 66.32% 
+Log Loss: 0.85
 ```
 
 #### Adaptive Synthetic (ADASYN) Method Result
 ```
 logr = LogisticRegression(solver='sag',multi_class="multinomial",n_jobs=-1)
-simple_eval(logr,X_ada, y_ada)
+a = simple_eval(logr, X_ada, y_ada, test_X_tf)
 ```
 Output:
 ```
-F1_micro/Acc : 65.04% 
+F1_micro/Acc : 66.35% 
+Log Loss: 0.85
 ```
 
 #### Random Over-Sampler Method Result
 ```
 logr = LogisticRegression(solver='sag',multi_class="multinomial",n_jobs=-1)
-simple_eval(logr,X_ra, y_ra)
+a = simple_eval(logr, X_ra, y_ra, test_X_tf)
 ```
 Output:
 ```
-F1_micro/Acc : 63.66% 
+F1_micro/Acc : 65.55% 
+Log Loss: 0.86
 ```
 
 ### Under-sampling Using NearMiss, RandomUnderSampler
 
 ```
 from imblearn.under_sampling import NearMiss, RandomUnderSampler
-print("First NM")
-nm = NearMiss(version=1,n_neighbors=5,random_state=10,n_jobs=-1)
-X_nm1, y_nm1 = nm.fit_sample(X,y)
-print("Class Distribution for NearMiss Version 1:\n",Counter(y_nm1))
 
-print("Second NM")
-nm = NearMiss(version=2,random_state=10,n_jobs=-1)
-X_nm2, y_nm2 = nm.fit_sample(X,y)
-print("Class Distribution for NearMiss Version 2:\n",Counter(y_nm2))
-
-print("Third NM")
-nm = NearMiss(version=3,random_state=10,n_jobs=-1)
-X_nm3, y_nm3 = nm.fit_sample(X,y)
-print("Class Distribution for NearMiss Version 3:\n",Counter(y_nm3))
-
+nm1 = NearMiss(version=1,random_state=10,n_jobs=-1)
+nm2 = NearMiss(version=2,random_state=10,n_jobs=-1)
+nm3 = NearMiss(version=3,random_state=10,n_jobs=-1)
 rus = RandomUnderSampler(random_state=10)
-X_rus, y_rus = rus.fit_sample(X,y)
-print("Class Distribution for NearMiss Version 4:\n",Counter(y_rus))
-```
-Output:
-```
-First NM
-Class Distribution for NearMiss Version 1:
- Counter({1: 9921, 2: 9921, 3: 9921, 4: 9921, 5: 9921})
-Second NM
-Class Distribution for NearMiss Version 2:
- Counter({1: 9921, 2: 9921, 3: 9921, 4: 9921, 5: 9921})
-Third NM
-Class Distribution for NearMiss Version 3:
- Counter({2: 9921, 1: 1714, 5: 925, 3: 683, 4: 618})
-Class Distribution for RandomUnderSampler:
- Counter({1: 9921, 2: 9921, 3: 9921, 4: 9921, 5: 9921})
- ```
-
-#### Results
-RandomUnderSampler and Nearmiss version-2 yields best results among other under sampling methods, but fails to pass the success of the first model that trained on the original data mainly due to the scarcity of training data and inability to distinguish between similar classes. ~40% recall ~25% precision on 2-3-4 Star classes indicates the model is trying hard to find them, but fails.
-This model can be used in stacking and blending, because of the relative success in finding minority classes.
-
-```
-logr = LogisticRegression(solver='sag',multi_class="multinomial",n_jobs=-1)
-simple_eval(logr,X_rus, y_rus)
-```
-RandomUnderSampler
-Output:
-```
-              precision    recall  f1-score   support
-
-      1 Star       0.77      0.66      0.71      8440
-     2 Stars       0.22      0.40      0.29      2434
-     3 Stars       0.26      0.40      0.32      2832
-     4 Stars       0.31      0.45      0.36      5288
-     5 Stars       0.89      0.69      0.78     20579
-
-    accuracy                           0.61     39573
-   macro avg       0.49      0.52      0.49     39573
-weighted avg       0.70      0.61      0.65     39573
-
-F1_micro/Acc : 61.27% 
 ```
 
 NearMiss Version-1
 ```
-F1_micro/Acc : 39.42% 
+X_nm1, y_nm1 = nm1.fit_sample(X_tf,y)
+print("Class Distribution for Nearmiss Version 1:\n",Counter(y_nm1))
+
+logr = LogisticRegression(solver='sag',multi_class="multinomial",n_jobs=-1)
+a= simple_eval(logr,X_nm1, y_nm1, test_X_tf)
+del X_nm1, y_nm1
+
+>> 
+F1_micro/Acc : 37.16% 
+Log Loss: 1.37
 ```
+
 NearMiss Version-2
 ```
-F1_micro/Acc : 60.18% 
+X_nm2, y_nm2 = nm2.fit_sample(X_tf,y)
+print("Class Distribution for Nearmiss Version 2:\n",Counter(y_nm2))
+
+logr = LogisticRegression(solver='sag',multi_class="multinomial",n_jobs=-1)
+a = simple_eval(logr,X_nm2, y_nm2, test_X_tf)
+del X_nm2, y_nm2
+
+>> 
+F1_micro/Acc : 61.65% 
+Log Loss: 0.98
 ```
+
 NearMiss Version-3
 ```
-F1_micro/Acc : 16.98% 
+>>
+F1_micro/Acc : 15.94% 
+Log Loss: 2.61
 ```
+
+Random Under Sampler
+```
+>>
+F1_micro/Acc : 61.54% 
+Log Loss: 0.96
+```
+
+#### Under-sampling Results
+RandomUnderSampler and Nearmiss version-2 yields best results among other under sampling methods, but fails to pass the success of the first model that trained on the original data mainly due to the scarcity of training data and inability to distinguish between similar classes. ~40% recall ~25% precision on 2-3-4 Star classes indicates the model is trying hard to find them, but fails.
+This model can be used in stacking and blending, because of the relative success in finding minority classes.
+
 
 ### Moving on with the original data and no class weight assignment
 
 ### LogisticRegression
-Image shows the top Tfidf features and their weights measured by the first logistic regression model, which trained on the original data and had no class weights assigned.
+
+#### Tuning Hyperparameters with GridSearch
+```
+from sklearn.model_selection import GridSearchCV
+def HyperOpti(trainX, trainY, model, params, k=5):
+    """
+    params: Takes 1D dictionary
+    """
+    grid = GridSearchCV(model, cv=k, param_grid=params)
+    grid.fit(trainX, trainY)
+    
+    results = {}
+    for x,y in zip(*params.values(), grid.cv_results_['mean_test_score']):
+        results[str(x)] = y
+    results = pd.DataFrame(results,index=[0])
+
+    
+    ax = sns.barplot(data=results)
+    ax.set_ylabel('Accuracy', size=15)
+    ax.set_xlabel('Parameter', size=15)
+    ax.tick_params(labelsize=14)
+    
+    best=grid.best_params_.popitem()
+    print("Best parameter is {}".format(best))
+    
+    return best
+```
+
+```
+%%time
+# Training on the standard data with class weights.
+params = {'C': [1e-5, 1e-3, 1e-1, 1e0, 1e1, 1e2]}
+logr = LogisticRegression(solver='sag', multi_class="multinomial", n_jobs=-1)
+p, a = HyperOpti(X_tf, y, logr, params)
+logr.C = a
+>>
+```
+![logbestp](https://user-images.githubusercontent.com/23128332/64973413-a5910100-d8b3-11e9-9c34-273af1193052.JPG)
+
+
+```
+logr, logr_probs = simple_eval(logr, X_tf, y, test_X_tf)
+
+>>
+              precision    recall  f1-score   support
+
+      1 Star       0.70      0.89      0.79      7480
+     2 Stars       0.28      0.05      0.08      2132
+     3 Stars       0.39      0.20      0.26      2474
+     4 Stars       0.46      0.21      0.29      4667
+     5 Stars       0.80      0.95      0.87     19142
+
+    accuracy                           0.74     35895
+   macro avg       0.53      0.46      0.46     35895
+weighted avg       0.68      0.74      0.69     35895
+
+F1_micro/Acc : 73.54% 
+Log Loss: 0.72
+```
+
+
+Image below shows the top Tfidf features and their weights measured by the first logistic regression model, which trained on the original data and had no class weights assigned.
 
 At first glance, we can see that there is no leakage left in the data. Some review texts contained target information, such as "gave two stars"; also phone brand and model information could had a similar affect.
 
@@ -944,25 +1042,32 @@ Output:
 
 ## Stochastic Gradient Descent Classifier
 ```
-sgd = SGDClassifier(loss='hinge', penalty='l2',alpha=1e-5, n_jobs=-1)
+params = {'alpha':[1e-10, 1e-7, 1e-5, 1e-3, 1e-1, 1e-0]}
+sgd = SGDClassifier(loss='modified_huber', penalty='l2', n_jobs=-1)
+p, a= HyperOpti(X_tf, y, sgd, params)
+sgd.alpha = a
+
 #sgd, sgd_preds = model_eval(sgd)
 sgd, sgd_preds = simple_eval(sgd,X,y)
+>>
 ```
-Output:
+![image](https://user-images.githubusercontent.com/23128332/64973652-0fa9a600-d8b4-11e9-9bd4-0f461c176beb.png)
+
 ```
               precision    recall  f1-score   support
 
-      1 Star       0.69      0.90      0.78      8390
-     2 Stars       0.25      0.05      0.08      2450
-     3 Stars       0.40      0.12      0.19      2807
-     4 Stars       0.44      0.14      0.22      5166
-     5 Stars       0.78      0.96      0.86     20760
+      1 Star       0.71      0.85      0.78      7480
+     2 Stars       0.24      0.08      0.12      2132
+     3 Stars       0.33      0.21      0.26      2474
+     4 Stars       0.40      0.22      0.28      4667
+     5 Stars       0.81      0.93      0.87     19142
 
-    accuracy                           0.73     39573
-   macro avg       0.51      0.44      0.43     39573
-weighted avg       0.66      0.73      0.67     39573
+    accuracy                           0.72     35895
+   macro avg       0.50      0.46      0.46     35895
+weighted avg       0.67      0.72      0.69     35895
 
-F1_micro/Acc : 72.79% 
+F1_micro/Acc : 72.32% 
+Log Loss: 2.27
 ```
 
 ```
@@ -978,80 +1083,50 @@ Output:
 ![SGDwords](https://user-images.githubusercontent.com/23128332/63623208-b080aa80-c601-11e9-982c-dc232d7e16fa.JPG)
 
 
-## Linear Support Vector Classifier
-```
-from sklearn.svm import LinearSVC
-svc = LinearSVC()
-svc, svc_preds = simple_eval(svc,X,y)
-```
-Output:
-```
-              precision    recall  f1-score   support
-
-      1 Star       0.72      0.83      0.77      8390
-     2 Stars       0.25      0.12      0.16      2450
-     3 Stars       0.31      0.19      0.23      2807
-     4 Stars       0.39      0.24      0.30      5166
-     5 Stars       0.81      0.92      0.86     20760
-
-    accuracy                           0.71     39573
-   macro avg       0.49      0.46      0.46     39573
-weighted avg       0.66      0.71      0.68     39573
-
-F1_micro/Acc : 71.31% 
-```
-
-```
-eli5.show_weights(svc, vec=tfidf, top=40)
-```
-Output:
-![SVCwords](https://user-images.githubusercontent.com/23128332/63623671-dbb7c980-c602-11e9-9f4e-5d067d19028c.JPG)
-
 # MultinomialNB()
 ```
-from sklearn.naive_bayes import MultinomialNB
 MNB = MultinomialNB()
-MNB, MNB_preds = simple_eval(MNB)
+#MNB, MNB_preds = model_eval(MNB)
+MNB, MNB_probs = simple_eval(MNB, X_tf, y, test_X_tf)
 ```
 Output:
 ```
               precision    recall  f1-score   support
 
-      1 Star       0.65      0.91      0.76      8390
-     2 Stars       0.50      0.00      0.00      2450
-     3 Stars       0.49      0.02      0.03      2807
-     4 Stars       0.40      0.16      0.23      5166
-     5 Stars       0.77      0.96      0.85     20760
+      1 Star       0.65      0.91      0.76      7480
+     2 Stars       0.00      0.00      0.00      2132
+     3 Stars       0.53      0.01      0.02      2474
+     4 Stars       0.45      0.10      0.17      4667
+     5 Stars       0.76      0.97      0.85     19142
 
-    accuracy                           0.72     39573
-   macro avg       0.56      0.41      0.37     39573
-weighted avg       0.66      0.72      0.64     39573
+    accuracy                           0.72     35895
+   macro avg       0.48      0.40      0.36     35895
+weighted avg       0.64      0.72      0.64     35895
 
-F1_micro/Acc : 71.56% 
+F1_micro/Acc : 72.11% 
+Log Loss: 0.84
 ```
-
 
 ## RandomForestClassifier
 ```
-tree = RandomForestClassifier(verbose=1, n_jobs=-1)
-tree , tree_preds = model_eval(tree,k=2)
-pickle.dump(svc ,open("bigoltree.sav", 'wb'))
+tree = RandomForestClassifier(max_depth=300, n_estimators=50, verbose=1, n_jobs=-1)
+#tree , tree_preds = model_eval(tree, k=3)
+tree , tree_probs = simple_eval(tree,X_tf, y, test_X_tf)
 ```
 Output:
 ```
-              precision    recall  f1-score   support
+      1 Star       0.65      0.85      0.73      7480
+     2 Stars       0.26      0.01      0.02      2132
+     3 Stars       0.34      0.02      0.04      2474
+     4 Stars       0.43      0.04      0.07      4667
+     5 Stars       0.73      0.97      0.83     19142
 
-      1 Star       0.61      0.83      0.70      8361
-     2 Stars       0.21      0.03      0.05      2489
-     3 Stars       0.27      0.06      0.10      2810
-     4 Stars       0.36      0.09      0.15      5335
-     5 Stars       0.74      0.93      0.82     20578
+    accuracy                           0.70     35895
+   macro avg       0.48      0.38      0.34     35895
+weighted avg       0.62      0.70      0.61     35895
 
-    accuracy                           0.68     39573
-   macro avg       0.44      0.39      0.36     39573
-weighted avg       0.59      0.68      0.61     39573
-
-F1_micro/Acc : 67.55% 
+F1_micro/Acc : 70.19% 
+Log Loss: 0.91
 ```
 
 ```
@@ -1075,32 +1150,30 @@ fig = go.Figure(data=[trace], layout=layout)
 py.iplot(fig)
 ```
 Output:
-![treefeat](https://user-images.githubusercontent.com/23128332/63623942-ad86b980-c603-11e9-8753-15c6040d5522.JPG)
+![image](https://user-images.githubusercontent.com/23128332/65023077-cb151d80-d93a-11e9-99e4-771bce42069c.png)
 
 
 ## Lightgbm
 ```
-import lightgbm as lgb
-from lightgbm import LGBMClassifier
-
-model = LGBMClassifier()
-lgb_model, lgb_preds = simple_eval(model)
+model = LGBMClassifier(objective='softmax')
+lgb_model, lgb_probs = simple_eval(model,X_tf,y,test_X_tf)
 ```
 Output:
 ```
               precision    recall  f1-score   support
 
-      1 Star       0.68      0.83      0.75      8390
-     2 Stars       0.30      0.05      0.09      2450
-     3 Stars       0.39      0.13      0.20      2807
-     4 Stars       0.42      0.20      0.27      5166
-     5 Stars       0.77      0.94      0.85     20760
+      1 Star       0.67      0.84      0.75      7480
+     2 Stars       0.31      0.03      0.06      2132
+     3 Stars       0.38      0.13      0.20      2474
+     4 Stars       0.44      0.18      0.26      4667
+     5 Stars       0.77      0.95      0.85     19142
 
-    accuracy                           0.71     39573
-   macro avg       0.51      0.43      0.43     39573
-weighted avg       0.65      0.71      0.66     39573
+    accuracy                           0.71     35895
+   macro avg       0.51      0.43      0.42     35895
+weighted avg       0.65      0.71      0.66     35895
 
-F1_micro/Acc : 70.91%
+F1_micro/Acc : 71.49% 
+Log Loss: 0.78
 ```
 
 # Neural Networks
@@ -1109,89 +1182,115 @@ Embedding, LSTM, GRU and other tactics resulted in limited success.
 Transfer Learning might help (Spacy, GloVe embeddings).
 
 ```
-#Load data
 df = pd.read_csv('cleaned_amazon_yuge.csv')
-df.dropna(axis=0, inplace=True)
-df.reset_index(drop=True, inplace=True)
-
+df = df.dropna(axis=0).sample(frac=1, random_state=13).reset_index(drop=True)
 X = df['Text']
 y = df['Stars']
 
-# Calculate Class Weights
-from sklearn.utils import class_weight
-class_weights = class_weight.compute_class_weight('balanced',
-                                                 np.unique(y),
-                                                 y)
-
-# Tokenizing the data and pad sequences
-xtrain,xtest,ytrain,ytest = train_test_split(X,y,test_size=0.2,random_state=10)
-tokenizer = text.Tokenizer()
+from sklearn.preprocessing import OneHotEncoder
+ohe = OneHotEncoder(sparse=False)
+ohe.fit(y.values.reshape(-1,1))
+max_len=200
+tokenizer = text.Tokenizer(num_words=max_len)
 tokenizer.fit_on_texts(X)
-del df,X,y
+
+X = tokenizer.texts_to_sequences(X)
+X = sequence.pad_sequences(X, maxlen = 200).astype(np.int32)
+y = ohe.transform(y.values.reshape(-1,1)).astype(np.uint8)
+
+xtrain, xtest, ytrain, ytest = train_test_split(X, y, test_size=0.2, random_state=10)
+del df, X, y
 gc.collect()
+```
+## Transfer Learning
 
-xtrain = tokenizer.texts_to_sequences(xtrain)
-xtest  = tokenizer.texts_to_sequences(xtest)
-xtrain = sequence.pad_sequences(xtrain)
-xtest = sequence.pad_sequences(xtest)
+### Pretrained GloVe 300D Embedding
+```
+f = open('glove.840B.300d/glove.840B.300d.txt', encoding='utf-8')
+embeddings_index={}
+for line in f:
+    values = line.split()
+    word = values[0]
+    try:
+        coefs = np.asarray(values[1:], dtype='float32')
+        embeddings_index[word] = coefs
+    except ValueError:
+        pass
+f.close()
 
-ytrain = ohe.transform(ytrain.values.reshape(-1,1))
-ytest = ohe.transform(ytest.values.reshape(-1,1))
+word_index = tokenizer.word_index
+embedding_matrix = np.zeros((len(word_index) + 1, 300))
+for word, i in word_index.items():
+    embedding_vector = embeddings_index.get(word)
+    if embedding_vector is not None:
+        embedding_matrix[i] = embedding_vector
+```
+```
+from keras.callbacks import EarlyStopping
+earlystop = EarlyStopping(monitor='val_loss',patience=3, min_delta=0, verbose=0, mode='auto')
 
+nlabels=5
 
-def build_model():
-    embed_dim = 10
-    nlabels=5
-    hidden_u = 1
-    conv_u = 4
-    attention_u = 5
-    
-    model = Sequential()
-    model.add(layers.Embedding(xtrain.shape[1], embed_dim, trainable=True))
-    #model.add(layers.GRU(units=hidden_u), dropout=0.2, recurrent_dropout=0.2))
-    
-    model.add(layers.GlobalMaxPool1D())
-    #model.add(layers.Dense(attention_u, activation = 'relu'))
-    #model.add(layers.Dropout(0.5))
-    #model.add(layers.Dense(attention_u, activation='relu'))
-    model.add(layers.Dense(nlabels, activation='softmax')) #'sigmoid'
-    model.compile(loss='categorical_crossentropy',
-                 optimizer='adam',# optimizer.SGD(lr=1e-3)
-                 metrics=['acc'])
-    return model
+model = Sequential()
+model.add(layers.Embedding(len(word_index)+1,
+                           300,
+                           weights=[embedding_matrix],
+                           input_length=max_len,
+                           trainable=False))
+model.add(layers.SpatialDropout1D(0.3))
+model.add(layers.GRU(300, dropout=0.3, recurrent_dropout=0.3, return_sequences=True))
+model.add(layers.GRU(300, dropout=0.3, recurrent_dropout=0.3))
 
-batch=10000
-epoch=40
+model.add(layers.Dense(512, activation='relu'))
+model.add(layers.Dropout(0.8))
 
-model = build_model()
+model.add(layers.Dense(nlabels, activation='sigmoid')) #'sigmoid'
+model.compile(loss='categorical_crossentropy',
+                optimizer='adam', #'adam',# optimizer.SGD(lr=1e-3)
+                metrics=['acc'])
+model.summary()
+
+batch=512
+epoch=30
+
 history = model.fit(xtrain, ytrain,
                     validation_split=0.2,
                     epochs=epoch,
                     batch_size=batch,
-                   class_weight=class_weights)
+                   verbose=1,
+                   callbacks=[earlystop])
 score, acc = model.evaluate(xtest, ytest,
                             batch_size=batch)
+model.save('gru_model.h5')
+#model.save_weights('gru_weights.h5')
 
-NN_preds = model.predict(xtest,batch_size=batch)
+NN_preds = model.predict_proba(xtest,batch_size=batch)
+print(confusion_matrix(np.argmax(ytest, axis=1)+1, np.argmax(NN_preds, axis=1)+1))
 print(classification_report(np.argmax(ytest, axis=1)+1, np.argmax(NN_preds, axis=1)+1))
+print('Log Loss: {:.2f}'.format(log_loss(ytest, NN_preds)))
 plot_history(history)
-```
 
-
-Output:
-```
+>>
+[[ 6297     5   207    96   875]
+ [ 1418     8   229   126   351]
+ [  919     7   400   464   684]
+ [  375     3   232   849  3208]
+ [  640     0    89   461 17952]]
               precision    recall  f1-score   support
 
-           1       0.63      0.84      0.72      8324
-           2       0.00      0.00      0.00      2470
-           3       0.00      0.00      0.00      2799
-           4       0.00      0.00      0.00      5337
-           5       0.70      0.97      0.81     20643
+           1       0.65      0.84      0.74      7480
+           2       0.35      0.00      0.01      2132
+           3       0.35      0.16      0.22      2474
+           4       0.43      0.18      0.25      4667
+           5       0.78      0.94      0.85     19142
 
-    accuracy                           0.68     39573
-   macro avg       0.27      0.36      0.31     39573
-weighted avg       0.50      0.68      0.57     39573
+    accuracy                           0.71     35895
+   macro avg       0.51      0.43      0.41     35895
+weighted avg       0.65      0.71      0.66     35895
+
+Log Loss: 0.78
 ```
-![image](https://user-images.githubusercontent.com/23128332/63638136-15351700-c68d-11e9-921b-29a8470f9577.png)
+
+![image](https://user-images.githubusercontent.com/23128332/65022977-9dc86f80-d93a-11e9-8702-9a801b37cad6.png)
 
 
