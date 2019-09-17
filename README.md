@@ -31,80 +31,44 @@ import pickle
 import time
 import string
 import os
-os.chdir(r"C:\Users\dogus\OneDrive\Masaüstü\DgsPy\DgsPy_DBOX\Amazon Project")
-
+os.chdir("C:/Datasets/Amazon/")
+import gc
 import plotly.offline as py
 py.init_notebook_mode(connected=True)
 import plotly.graph_objs as go
+
+import seaborn as sns
 import matplotlib.pyplot as plt
 plt.style.use('ggplot')
 %matplotlib inline
-
 from nltk.corpus import stopwords
-from contextlib import contextmanager
-import eli5
 
+import eli5
 from collections import Counter
 
-from imblearn.under_sampling import NearMiss, RandomUnderSampler
-from imblearn.over_sampling import SMOTE, ADASYN, RandomOverSampler
-
 from sklearn.preprocessing import OneHotEncoder
-from sklearn.model_selection import ShuffleSplit, learning_curve
+from sklearn.model_selection import learning_curve
 from sklearn.model_selection import train_test_split
 from sklearn.model_selection import StratifiedKFold
-
-from sklearn.linear_model import SGDClassifier
-from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import confusion_matrix, classification_report
-from sklearn.metrics import f1_score, log_loss,precision_score, recall_score
-from sklearn.metrics import accuracy_score
-from sklearn.metrics import roc_curve
-from sklearn.metrics import roc_auc_score
+from sklearn.metrics import f1_score, log_loss, accuracy_score, mean_squared_log_error
 from sklearn.utils import class_weight
+from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer
 
-from sklearn.feature_extraction.text import TfidfTransformer, TfidfVectorizer, CountVectorizer
+from sklearn.naive_bayes import MultinomialNB
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.ensemble import VotingClassifier
+from sklearn.linear_model import LogisticRegression,SGDClassifier
 
-import lightgbm as lgb
 from lightgbm import LGBMClassifier
-from xgboost import XGBClassifier
-
-import gc
 
 import tensorflow as tf
-from tensorflow.keras import backend as K
-num_cores = 4
+from keras import backend as K
 
-CPU=False
-GPU=True
-if GPU:
-    num_GPU = 1
-    num_CPU = 1
-if CPU:
-    print("Keras will run on CPU")
-    num_CPU = 1
-    num_GPU = 0
-
-config = tf.ConfigProto(intra_op_parallelism_threads=num_cores,
-                        inter_op_parallelism_threads=num_cores, 
-                        allow_soft_placement=True,
-                        device_count = {'CPU' : num_CPU,
-                                        'GPU' : num_GPU}
-                       )
-
-session = tf.Session(config=config)
-K.set_session(session)
-
-from tensorflow.keras.preprocessing import text, sequence
-from tensorflow.keras import optimizers
-from tensorflow.keras import layers
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.optimizers import Adam
-
-from IPython.display import SVG
-from keras.utils.vis_utils import model_to_dot
+from keras.preprocessing import text, sequence
+from keras import optimizers
+from keras import layers
+from keras.models import Sequential
+from keras.optimizers import Adam
 
 import warnings
 warnings.filterwarnings("ignore")
@@ -114,12 +78,18 @@ warnings.filterwarnings("ignore")
 ## Functions Used
 ```
 def combine_CSVs_infolder():
-    os.chdir(r"C:\Users\dogus\Dropbox\DgsPy_DBOX\Amazon Project\comments_AMAZON")
+    """
+    Concatenate all the review data under one csv.
+    """
+    os.chdir(r"..\comments_AMAZON")
     filenames = os.listdir()
     comb = pd.concat( [pd.read_csv(f) for f in filenames])
     comb.to_csv('AMAZON_comments_yuge.csv', index=False)
 
 def clean_str(text):
+    """
+    Leave only workable text data.
+    """
     try:
         text = ' '.join( [w for w in text.split()] )        
         text = text.lower()
@@ -138,19 +108,18 @@ def clean_str(text):
         text = re.sub(u"\xed", u"i", text)
         text = re.sub(u"w\/", u" with ", text)
         
-        text = re.sub(u"[^a-z0-9]", " ", text)  # delete unnecessary characters
-        text = u" ".join(re.split('(\d+)',text) )
+        text = re.sub(u"[^a-z0-9]", " ", text)
+        text = re.sub(r'\d+', '', text)
         text = re.sub( u"\s+", u" ", text ).strip()
         text = ''.join(text)
     except:
         text = np.NaN
     return text
 
-def clean_int2(text):
-    output = re.sub(r'\d+', '', str(text))
-    return output
-
 def sorttext(x):
+    """
+    Select only the user review from text data.
+    """
     iscolor = x[3][:5]=='Color'
     isprovider = x[3][:17]=='Service Provider:'
     issize = x[3][:5]=='Size:'
@@ -169,6 +138,7 @@ def sorttext(x):
     return x
 
 def goBar(variables,name,text=None):
+    """ Plotly Bar Plot """
     trace= go.Bar(
             x=variables.index,
             y=variables.values,
@@ -191,6 +161,15 @@ def goBar(variables,name,text=None):
 
 def plot_learning_curve(estimator, title, X, y, scoring=None, ylim=None, cv=None,
                         n_jobs=1, train_sizes=np.linspace(.1, 1.0, 5)):
+    """
+    estimator:  model
+    title: Graph title
+    X: train data
+    y: test data
+    scoring: accuracy, neg_log_loss, etc.
+    ylim: y limit
+    cv: split (takes integer)
+    """
     plt.figure()
     plt.subplots(figsize=(12,6))
     plt.title(title)
@@ -222,8 +201,8 @@ def plot_learning_curve(estimator, title, X, y, scoring=None, ylim=None, cv=None
     plt.legend(loc="best")
     plt.savefig('learningcurves.png')
     return plt
-    
-def model_eval(model, k=5, seed=0):
+
+def model_eval(model, X, y, k=5, seed=0):
     kfold = StratifiedKFold(k, shuffle=True,random_state=seed)
     oof = np.zeros(y.shape[0])
     for nfold, (train_ix, valid_ix) in enumerate(kfold.split(X,y)):
@@ -233,20 +212,26 @@ def model_eval(model, k=5, seed=0):
         model.fit(trainX, trainy)
         p = model.predict(validX)
         oof[valid_ix] = p
-        print('Fold{}, F1_micro : {:.2%}'.format(nfold+1,f1_score(validy, p, average='micro')))
-    
+        print('Fold{}, Accuracy : {:.2%}'.format(nfold+1, accuracy_score(validy, p)))
+        print('Log Loss: {:.2f}'.format(log_loss(validy, p)))
     print(confusion_matrix(y, oof))
     print(classification_report(y, oof, target_names=["1 Star", "2 Stars", "3 Stars", "4 Stars", "5 Stars"]))
-    print("F1_micro : {:.2%} ".format(f1_score(test_y, p, average='micro')))
+    print("Accuracy : {:.2%}".format(accuracy_score(y, p)))
+    print("Log Loss: {:.2f}".format(log_loss(y, p)))
     return model, oof
 
-def simple_eval(model,xtrain,ytrain):
-    model.fit(xtrain, ytrain)
-    p = model.predict(test_X)
-
+def simple_eval(model, X, y, val_X):
+    model.fit(X, y)
+    p = model.predict(val_X)
+    prob = model.predict_proba(val_X)
     print(classification_report(test_y, p, target_names=["1 Star", "2 Stars", "3 Stars", "4 Stars", "5 Stars"]))
     print("F1_micro/Acc : {:.2%} ".format(f1_score(test_y, p, average='micro')))
-    return model, p
+    print('Log Loss: {:.2f}'.format(log_loss(test_y, prob, labels=[1,2,3,4,5])))
+    return model, prob
+
+def pickle_model(model, filename):
+    MODEL_PATH = "C:/Datasets/model_save/"
+    pickle.dump(model, open(MODEL_PATH+filename, 'wb'))
 
 def plot_history(history):
     acc = history.history['acc']
@@ -266,11 +251,6 @@ def plot_history(history):
     plt.plot(x, val_loss, 'r', label='Validation loss')
     plt.title('Training and validation loss')
     plt.legend()
-
-def pickle_model(model, filename):
-    try: os.mkdir("models")
-    except:pass
-    pickle.dump(model, open("models/"+filename, 'wb'))
 ```
 
 ## Read the merged data
